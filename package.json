@@ -18,10 +18,20 @@
       "src/jearcast-view/dist/**/*"
     ],
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": ["AppImage", "deb", "pacman"],
       "category": "AudioVideo",
-      "icon": "build/icon.png"
-    }
+      "icon": "build/icons/jearcastapp_electrone.png"
+    },
+    "extraResources": [
+      {
+        "from": "build/icons/jearcastapp_electrone.png",
+        "to": "icons/jearcastapp_electrone.png"
+      },
+      {
+        "from": "linux/jearcastapp_electrone.desktop",
+        "to": "jearcastapp_electrone.desktop"
+      }
+    ]
   },
   "repository": {
     "type": "git",
@@ -39,5 +49,8 @@
   "devDependencies": {
     "electron": "^37.2.0",
     "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
   }
 }

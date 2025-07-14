@@ -2,7 +2,7 @@
 node_modules/
 
 # 🏗️ Carpetas de construcción
-dist/
+# dist/
 dist_electron/
 out/
 

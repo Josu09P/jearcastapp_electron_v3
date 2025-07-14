@@ -1,37 +1,40 @@
-const { app, BrowserWindow, Menu } = require('electron')
+const { app, BrowserWindow } = require('electron')
 const path = require('path')
-const url = require('url')
+const express = require('express')
+
+let mainWindow
 
 function createWindow() {
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    autoHideMenuBar: true, // 👈 oculta la barra de menú
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  })
+  const expressApp = express()
+  const distPath = path.join(__dirname, 'jearcast-view', 'dist')
 
-  win.loadURL(
-    url.format({
-      pathname: path.join(__dirname, 'jearcast-view', 'dist', 'index.html'),
-      protocol: 'file:',
-      slashes: true
+  expressApp.use(express.static(distPath))
+
+  const server = expressApp.listen(3000, () => {
+    console.log('Servidor interno corriendo en http://localhost:3000')
+
+    mainWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      autoHideMenuBar: true,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        preload: path.join(__dirname, './preload.js'),
+      },
     })
-  )
 
-  // Solo abrir devtools en modo desarrollo
-  if (!app.isPackaged) {
-    win.webContents.openDevTools()
-  }
+    mainWindow.loadURL('http://localhost:3000')
+
+  /*
+    if (!app.isPackaged) {
+      mainWindow.webContents.openDevTools()
+    }
+  */
+  })
 }
 
-// Elimina la barra de menú global (como "File, Edit...") completamente
-app.whenReady().then(() => {
-  Menu.setApplicationMenu(null)
-  createWindow()
-})
+app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
