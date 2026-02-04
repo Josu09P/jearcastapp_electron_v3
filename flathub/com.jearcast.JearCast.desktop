@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=JearCast Player
+Comment=Desktop music player
+Exec=jearcast
+Icon=com.jearcast.JearCast
+Type=Application
+Categories=AudioVideo;Music;
+StartupWMClass=JearCast

@@ -1,7 +1,7 @@
 {
-  "name": "jearcastapp_electrone",
+  "name": "jearcast",
   "version": "1.0.0",
-  "description": "proyect_init_jearcastapp_v2",
+  "description": "JearCast Player - Desktop App",
   "main": "src/main.js",
   "scripts": {
     "dev": "electron .",
@@ -11,41 +11,41 @@
     "appId": "com.jearcast.desktop",
     "productName": "JearCast Player",
     "directories": {
-      "output": "dist_electron"
+      "output": "dist_electron",
+      "buildResources": "build"
     },
     "files": [
       "src/main.js",
+      "src/preload.js",
       "src/jearcast-view/dist/**/*"
     ],
     "linux": {
-      "target": ["AppImage", "deb", "pacman"],
+      "target": [
+        "dir"
+      ],
       "category": "AudioVideo",
-      "icon": "build/icons/jearcastapp_electrone.png"
+      "icon": "build/icons"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icons/icon.ico"
     },
     "extraResources": [
       {
-        "from": "build/icons/jearcastapp_electrone.png",
-        "to": "icons/jearcastapp_electrone.png"
-      },
-      {
-        "from": "linux/jearcastapp_electrone.desktop",
+        "from": "/config/linux/jearcastapp_electrone.desktop",
         "to": "jearcastapp_electrone.desktop"
       }
     ]
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Josu09P/jearcastapp_electron_v2.git"
+    "url": "https://github.com/Josu09P/jearcastapp_electron_v3"
   },
   "author": {
     "name": "Josue Elias Algarate Rubio",
     "email": "josuealgarate24@gmail.com"
   },
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Josu09P/jearcastapp_electron_v2/issues"
-  },
-  "homepage": "https://github.com/Josu09P/jearcastapp_electron_v2#readme",
   "devDependencies": {
     "electron": "^37.2.0",
     "electron-builder": "^26.0.12"

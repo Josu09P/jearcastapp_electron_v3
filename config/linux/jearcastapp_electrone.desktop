@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=JearCast
+Comment=Escucha música directamente con JearCast
+Exec=jearcastapp_electrone %U
+Icon=icon
+Terminal=false
+Type=Application
+Categories=AudioVideo;Player;
+StartupNotify=true
+StartupWMClass=JearCast

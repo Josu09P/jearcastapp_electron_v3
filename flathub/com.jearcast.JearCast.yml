@@ -1,0 +1,38 @@
+app-id: com.jearcast.JearCast
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: jearcast
+arch: x86_64
+
+# 🔥 NECESARIO PARA npm / electron
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node20
+
+finish-args:
+  - --share=network
+  - --socket=x11
+  - --socket=wayland
+  - --device=dri
+  - --talk-name=org.freedesktop.Notifications
+  - --filesystem=xdg-music
+  - --filesystem=xdg-download
+  - --filesystem=xdg-documents
+  - --env=ELECTRON_DISABLE_SANDBOX=1
+
+modules:
+  - name: jearcast
+    buildsystem: simple
+
+    build-options:
+      append-path: /usr/lib/sdk/node20/bin
+
+    build-commands:
+      - npm install
+      - npm run build
+      - install -Dm755 dist_electron/linux-unpacked/jearcast /app/bin/jearcast
+
+    sources:
+      - type: git
+        url: https://github.com/Josu09P/jearcastapp_electron_v3.git
+        tag: v1.0.0
