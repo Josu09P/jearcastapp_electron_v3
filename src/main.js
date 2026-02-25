@@ -7,13 +7,22 @@ let mainWindow;
 
 function createWindow() {
   const expressApp = express();
-  const distPath = path.join(__dirname, "jearcast-view", "dist");
+  
+  /**
+   * CORRECCIÓN DE RUTAS PARA FLATPAK
+   * app.getAppPath() nos devuelve la ubicación de la raíz de la app 
+   * (donde está tu package.json). Desde ahí construimos rutas absolutas.
+   */
+  const appRoot = app.getAppPath();
+  const distPath = path.join(appRoot, "src", "jearcast-view", "dist");
+  const preloadPath = path.join(appRoot, "src", "preload.js");
 
+  // Servidor interno para servir los archivos de Vue (Evita bloqueos de YouTube)
   expressApp.use(express.static(distPath));
 
-  // Servidor interno
-  expressApp.listen(3353, () => {
-    console.log("Servidor interno corriendo en http://localhost:3353");
+  // Escuchamos en el puerto 3353 localmente
+  expressApp.listen(3353, '127.0.0.1', () => {
+    console.log("Servidor interno de JearCast corriendo en http://localhost:3353");
 
     mainWindow = new BrowserWindow({
       width: 1400,
@@ -23,49 +32,52 @@ function createWindow() {
       title: "JearCast",
       titleBarStyle: "hidden",
       autoHideMenuBar: true,
-
-      // 🔥 Necesario para bordes redondeados
+      
+      // Configuración para bordes redondeados y transparencia
       transparent: true,
       backgroundColor: "#00000000",
 
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        preload: path.join(__dirname, "preload.js"),
+        preload: preloadPath, // Ruta absoluta corregida
         zoomFactor: 1.0,
       },
     });
 
+    // Cargamos la app a través del servidor Express local
     mainWindow.loadURL("http://localhost:3353");
 
+    // Configuración de límites de zoom
     mainWindow.webContents.setVisualZoomLevelLimits(1, 3);
     mainWindow.webContents.setZoomFactor(1);
 
+    // Abrir DevTools solo si no está empaquetado
     if (!app.isPackaged) {
       mainWindow.webContents.openDevTools();
     }
 
-    // 🔐 Bloquear F12 y CTRL+SHIFT+I
+    // --- SEGURIDAD Y EVENTOS DE ENTRADA ---
+
+    // Bloquear F12 y CTRL+SHIFT+I
     mainWindow.webContents.on("before-input-event", (event, input) => {
       const key = input.key.toLowerCase();
       const isShortcut =
-        (input.control || input.meta) && input.shift && key === "i" ||
+        ((input.control || input.meta) && input.shift && key === "i") ||
         input.key === "F12";
 
       if (isShortcut) {
         event.preventDefault();
-        return;
       }
     });
 
-    // ❌ Bloquear menú contextual
+    // Bloquear menú contextual (clic derecho)
     mainWindow.webContents.on("context-menu", (event) => {
       event.preventDefault();
     });
 
-    // 🔍 Control de zoom
+    // Control de zoom con teclado (Ctrl + / Ctrl -)
     let currentZoom = 1;
-
     mainWindow.webContents.on("before-input-event", (event, input) => {
       const key = input.key.toLowerCase();
 
@@ -89,7 +101,7 @@ function createWindow() {
       }
     });
 
-    // 🖱️ Zoom con scroll
+    // Control de zoom con rueda del ratón + Ctrl
     mainWindow.webContents.on("wheel", (event, delta) => {
       if (event.ctrlKey) {
         if (delta.deltaY < 0) currentZoom += 0.1;
@@ -104,8 +116,10 @@ function createWindow() {
   });
 }
 
+// --- CICLO DE VIDA DE LA APP ---
+
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(null); // Quitar menú superior predeterminado
   createWindow();
 });
 
@@ -117,7 +131,9 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 
-// 📁 Selector de música
+// --- COMUNICACIÓN IPC (Handlers) ---
+
+// Selector de directorios para música local
 ipcMain.handle("dialog:selectMusicDirectory", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openDirectory"],
@@ -127,20 +143,25 @@ ipcMain.handle("dialog:selectMusicDirectory", async () => {
 
   const folder = result.filePaths[0];
 
-  const musicFiles = fs
-    .readdirSync(folder)
-    .filter(
-      (f) => f.endsWith(".mp3") || f.endsWith(".wav") || f.endsWith(".ogg")
-    )
-    .map((f) => ({
-      name: f,
-      path: path.join(folder, f),
-    }));
+  try {
+    const musicFiles = fs
+      .readdirSync(folder)
+      .filter(
+        (f) => f.endsWith(".mp3") || f.endsWith(".wav") || f.endsWith(".ogg")
+      )
+      .map((f) => ({
+        name: f,
+        path: path.join(folder, f),
+      }));
 
-  return musicFiles;
+    return musicFiles;
+  } catch (error) {
+    console.error("Error leyendo el directorio:", error);
+    return [];
+  }
 });
 
-// 🪟 Control de ventana
+// Controles de la ventana personalizada
 ipcMain.on("window-minimize", () => mainWindow?.minimize());
 ipcMain.on("window-toggle-maximize", () => {
   if (!mainWindow) return;
