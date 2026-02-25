@@ -1,0 +1,3 @@
+#!/bin/sh
+# El flag --no-sandbox es vital en Flatpak para Electron
+exec /app/lib/jearcast/jearcast --no-sandbox "$@"

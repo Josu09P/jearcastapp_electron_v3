@@ -8,35 +8,24 @@
     "build": "electron-builder"
   },
   "build": {
-    "appId": "com.jearcast.desktop",
-    "productName": "JearCast Player",
-    "directories": {
-      "output": "dist_electron",
-      "buildResources": "build"
-    },
-    "files": [
-      "src/main.js",
-      "src/preload.js",
-      "src/jearcast-view/dist/**/*"
-    ],
-    "linux": {
-      "target": [
-        "dir"
-      ],
-      "category": "AudioVideo",
-      "icon": "build/icons"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "build/icons/icon.ico"
-    },
-    "extraResources": [
-      {
-        "from": "/config/linux/jearcastapp_electrone.desktop",
-        "to": "jearcastapp_electrone.desktop"
-      }
-    ]
+  "appId": "com.jearcast.JearCast",
+  "productName": "JearCast Player",
+  "directories": {
+    "output": "dist_electron",
+    "buildResources": "build"
   },
+  "files": [
+    "src/main.js",
+    "src/preload.js",
+    "src/jearcast-view/dist/**/*"
+  ],
+  "linux": {
+    "target": ["dir"],
+    "category": "AudioVideo",
+    "icon": "build/icons"
+  }
+}
+,
   "repository": {
     "type": "git",
     "url": "https://github.com/Josu09P/jearcastapp_electron_v3"

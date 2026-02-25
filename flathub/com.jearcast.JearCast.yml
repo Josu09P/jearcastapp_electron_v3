@@ -2,35 +2,54 @@ app-id: com.jearcast.JearCast
 runtime: org.freedesktop.Platform
 runtime-version: '23.08'
 sdk: org.freedesktop.Sdk
-command: jearcast
-arch: x86_64
+base: org.electronjs.Electron2.BaseApp
+base-version: '23.08'
+command: jearcast-wrapper
 
-# 🔥 NECESARIO PARA npm / electron
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.node20 # Coincide con tu versión local
+
+build-options:
+  append-path: /usr/lib/sdk/node20/bin
+  build-args:
+    - --share=network
 
 finish-args:
   - --share=network
+  - --share=ipc
   - --socket=x11
   - --socket=wayland
+  - --socket=pulseaudio
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
-  - --filesystem=xdg-music
-  - --filesystem=xdg-download
-  - --filesystem=xdg-documents
-  - --env=ELECTRON_DISABLE_SANDBOX=1
+  - --filesystem=xdg-music:ro
 
 modules:
   - name: jearcast
     buildsystem: simple
-
-    build-options:
-      append-path: /usr/lib/sdk/node20/bin
-
     build-commands:
+      # CORRECCIÓN 2: NPM necesita saber dónde escribir archivos temporales
+      - npm config set cache /run/build/jearcast/.npm-cache
+      
       - npm install
       - npm run build
-      - install -Dm755 dist_electron/linux-unpacked/jearcast /app/bin/jearcast
+      
+      - mkdir -p /app/lib/jearcast
+      - mkdir -p /app/bin
+      
+      # Copiamos el resultado del build de electron-builder
+      - cp -r dist_electron/linux-unpacked/* /app/lib/jearcast/
+      
+      # Instalamos archivos de soporte (Rutas relativas a la raíz del git)
+      - install -Dm755 flathub/jearcast-wrapper /app/bin/jearcast-wrapper
+      - install -Dm644 flathub/com.jearcast.JearCast.desktop /app/share/applications/com.jearcast.JearCast.desktop
+      - install -Dm644 flathub/com.jearcast.JearCast.metainfo.xml /app/share/metainfo/com.jearcast.JearCast.metainfo.xml
+
+      - |
+        for size in 32 64 128 256 512; do
+          install -Dm644 flathub/icons/hicolor/${size}x${size}/apps/com.jearcast.JearCast.png \
+            /app/share/icons/hicolor/${size}x${size}/apps/com.jearcast.JearCast.png
+        done
 
     sources:
       - type: git
