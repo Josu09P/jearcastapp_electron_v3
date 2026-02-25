@@ -7,7 +7,7 @@ base-version: '23.08'
 command: jearcast-wrapper
 
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node20 # Coincide con tu versión local
+  - org.freedesktop.Sdk.Extension.node20
 
 build-options:
   append-path: /usr/lib/sdk/node20/bin
@@ -28,23 +28,30 @@ modules:
   - name: jearcast
     buildsystem: simple
     build-commands:
-      # CORRECCIÓN 2: NPM necesita saber dónde escribir archivos temporales
+      # Configuramos el cache para evitar errores de permisos
       - npm config set cache /run/build/jearcast/.npm-cache
       
+      # Instalación de dependencias
       - npm install
-      - npm run build
       
+      # Generamos solo el directorio unpacked (limpio para Flatpak)
+      - npm run build -- --linux dir
+      
+      # Estructura de carpetas en /app
       - mkdir -p /app/lib/jearcast
       - mkdir -p /app/bin
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/metainfo
       
-      # Copiamos el resultado del build de electron-builder
+      # Copiamos los archivos compilados de Electron
       - cp -r dist_electron/linux-unpacked/* /app/lib/jearcast/
       
-      # Instalamos archivos de soporte (Rutas relativas a la raíz del git)
+      # Instalamos el lanzador y metadatos
       - install -Dm755 flathub/jearcast-wrapper /app/bin/jearcast-wrapper
       - install -Dm644 flathub/com.jearcast.JearCast.desktop /app/share/applications/com.jearcast.JearCast.desktop
       - install -Dm644 flathub/com.jearcast.JearCast.metainfo.xml /app/share/metainfo/com.jearcast.JearCast.metainfo.xml
 
+      # Instalación masiva de iconos
       - |
         for size in 32 64 128 256 512; do
           install -Dm644 flathub/icons/hicolor/${size}x${size}/apps/com.jearcast.JearCast.png \
@@ -54,4 +61,4 @@ modules:
     sources:
       - type: git
         url: https://github.com/Josu09P/jearcastapp_electron_v3.git
-        tag: main
+        branch: main # <--- IMPORTANTE: Usamos la rama principal para que vea tus cambios recientes
