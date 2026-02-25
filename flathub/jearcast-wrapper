@@ -1,3 +1,6 @@
 #!/bin/sh
-# El flag --no-sandbox es vital en Flatpak para Electron
-exec /app/lib/jearcast/jearcast --no-sandbox "$@"
+# Nos movemos al directorio de la app para asegurar que Express vea las carpetas
+cd /app/lib/jearcast/resources/app/src/
+
+# Ejecutamos el binario apuntando al archivo principal
+exec /app/lib/jearcast/jearcast --no-sandbox /app/lib/jearcast/resources/app/src/main.js "$@"
