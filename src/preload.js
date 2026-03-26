@@ -5,10 +5,14 @@ contextBridge.exposeInMainWorld('electron', {
   ipcRenderer: {
     send: (channel, data) => ipcRenderer.send(channel, data),
     on: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),
+    invoke: (channel, data) => ipcRenderer.invoke(channel, data),
   }
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url) => shell.openExternal(url),
   selectMusicDirectory: () => ipcRenderer.invoke('dialog:selectMusicDirectory'),
+  selectMusicFolder: () => ipcRenderer.invoke('select-music-folder'),
+  scanMusicFolder: (folderPath) => ipcRenderer.invoke('scan-music-folder', folderPath),
+  getAudioMetadata: (filePath) => ipcRenderer.invoke('get-audio-metadata', filePath),
 })
