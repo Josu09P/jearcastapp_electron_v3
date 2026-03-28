@@ -1,4 +1,3 @@
-// src/services/MPRISService.js
 const { EventEmitter } = require('events');
 const { app } = require('electron');
 
@@ -10,16 +9,17 @@ class MPRISService extends EventEmitter {
     this.metadata = {};
     this.currentPosition = 0;
     this.duration = 0;
+    this.sessionBus = null; // Guardamos referencia al bus
     
     setTimeout(() => {
       this.setupMPRIS();
-    }, 500); // Aumentar delay para asegurar que todo está listo
+    }, 1000); // Un poco más de delay ayuda a que el bus esté listo en Flatpak
   }
 
   setupMPRIS() {
     try {
       const dbus = require('dbus-native');
-      const sessionBus = dbus.sessionBus();
+      this.sessionBus = dbus.sessionBus();
       
       const serviceName = 'org.mpris.MediaPlayer2.jearcast';
       const objectPath = '/org/mpris/MediaPlayer2';
@@ -43,7 +43,7 @@ class MPRISService extends EventEmitter {
           HasTrackList: false,
           Identity: 'JearCast Music Player',
           DesktopEntry: 'com.jearcast.JearCast',
-          SupportedUriSchemes: ['file'],
+          SupportedUriSchemes: ['file', 'http', 'https'],
           SupportedMimeTypes: ['audio/mpeg', 'audio/x-mp3', 'audio/flac']
         },
         'org.mpris.MediaPlayer2.Player': {
@@ -88,14 +88,12 @@ class MPRISService extends EventEmitter {
           },
           Seek: (offset) => {
             const newPosition = Math.max(0, Math.min(this.duration, this.currentPosition + offset / 1000000));
-            console.log('MPRIS: Seek to', newPosition);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.webContents.send('seek-to', newPosition);
             }
           },
           SetPosition: (trackId, position) => {
             const newPosition = Math.min(this.duration, position / 1000000);
-            console.log('MPRIS: SetPosition to', newPosition);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.webContents.send('seek-to', newPosition);
             }
@@ -106,62 +104,28 @@ class MPRISService extends EventEmitter {
         }
       };
       
-      // Añadir propiedades dinámicas
       const playerProps = serviceObject['org.mpris.MediaPlayer2.Player'];
       
-      Object.defineProperty(playerProps, 'PlaybackStatus', {
-        get: () => this.playbackState,
-        enumerable: true
+      Object.defineProperties(playerProps, {
+        'PlaybackStatus': { get: () => this.playbackState, enumerable: true },
+        'Metadata': { get: () => this.metadata, enumerable: true },
+        'CanGoNext': { get: () => true, enumerable: true },
+        'CanGoPrevious': { get: () => true, enumerable: true },
+        'CanPlay': { get: () => true, enumerable: true },
+        'CanPause': { get: () => true, enumerable: true },
+        'CanSeek': { get: () => true, enumerable: true },
+        'Volume': { get: () => 1.0, set: (vol) => {}, enumerable: true }
       });
       
-      Object.defineProperty(playerProps, 'Metadata', {
-        get: () => this.metadata,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'CanGoNext', {
-        get: () => true,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'CanGoPrevious', {
-        get: () => true,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'CanPlay', {
-        get: () => true,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'CanPause', {
-        get: () => true,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'CanSeek', {
-        get: () => true,
-        enumerable: true
-      });
-      
-      Object.defineProperty(playerProps, 'Volume', {
-        get: () => 1.0,
-        set: (vol) => {},
-        enumerable: true
-      });
-      
-      // Registrar el nombre en el bus
-      sessionBus.requestName(serviceName, 0x4, (err, ret) => {
+      this.sessionBus.requestName(serviceName, 0x4, (err, ret) => {
         if (err) {
           console.error('Error registrando MPRIS:', err);
           return;
         }
         
-        sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2'], objectPath, 'org.mpris.MediaPlayer2');
-        sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, 'org.mpris.MediaPlayer2.Player');
+        this.sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2'], objectPath, 'org.mpris.MediaPlayer2');
+        this.sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, 'org.mpris.MediaPlayer2.Player');
         
-        // FORZAR NOTIFICACIÓN INICIAL:
-        // Esto le dice a GNOME "Hey, estoy aquí y estoy detenido"
         this.updatePlaybackState('Stopped');
       });
       
@@ -172,37 +136,45 @@ class MPRISService extends EventEmitter {
   
   updatePlaybackState(state) {
     const newState = state === 'playing' ? 'Playing' : state === 'paused' ? 'Paused' : 'Stopped';
+    
     if (this.playbackState !== newState) {
       this.playbackState = newState;
-      console.log('MPRIS: PlaybackState ->', newState);
-      // Emitir cambio de propiedad si es necesario
+      console.log('MPRIS: PlaybackStatus ->', newState);
+
+      // Notificar a GNOME que el estado cambió (Play/Pause)
+      try {
+        this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 
+          'PlaybackStatus': newState 
+        }, []);
+      } catch (err) {
+        console.error('Error emitiendo PlaybackStatus:', err);
+      }
     }
   }
-
-  /* TIP
-  updatePlaybackState(state) {
-  const newState = state === 'playing' ? 'Playing' : state === 'paused' ? 'Paused' : 'Stopped';
-  if (this.playbackState !== newState) {
-    this.playbackState = newState;
-    // Esto avisa a GNOME que refresque el icono del botón
-    this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 'PlaybackStatus': newState }, []);
-  }
-}
-  */
  
   updateMetadata({ title, artist, thumbnail, duration }) {
     this.duration = duration || 0;
     this.metadata = {
-      'xesam:title': title || '',
-      'xesam:artist': [artist || 'Unknown'],
+      'xesam:title': title || 'Desconocido',
+      'xesam:artist': [artist || 'Artista Desconocido'],
       'xesam:album': 'JearCast Player',
       'xesam:trackid': `/com/jearcast/track/${Date.now()}`,
       'mpris:length': (duration || 0) * 1000000,
       'mpris:artUrl': thumbnail || ''
     };
-    console.log('MPRIS: Metadata actualizada -', title);
+    
+    console.log('MPRIS: Enviando metadatos a GNOME:', title);
+
+    // Notificar a GNOME que la información de la canción cambió
+    try {
+      this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 
+        'Metadata': this.metadata 
+      }, []);
+    } catch (err) {
+      console.error('Error emitiendo Metadata:', err);
+    }
   }
-  
+
   updatePosition(position) {
     this.currentPosition = position || 0;
   }
