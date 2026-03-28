@@ -22,7 +22,7 @@ class DownloadService {
     this.activeDownloads = new Map();
     // EN DESARROLLO this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
     // EN FLATHUB
-    this.ytDlpPath = path.join(__dirname, "..", "bin", "yt-dlp");
+    this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
 
     if (!fs.existsSync(this.downloadsPath)) {
       fs.mkdirSync(this.downloadsPath, { recursive: true });
@@ -379,10 +379,7 @@ comment=Descargado con JearCast Music Player
 
   cancelDownload(downloadId) {
     console.log(`Intentando cancelar descarga: ${downloadId}`);
-    console.log(
-      `Descargas activas:`,
-      Array.from(this.activeDownloads.keys()),
-    );
+    console.log(`Descargas activas:`, Array.from(this.activeDownloads.keys()));
 
     const download = this.activeDownloads.get(downloadId);
 

@@ -1,6 +1,6 @@
 // src/services/MPRISService.js
 const { EventEmitter } = require('events');
-const { app } = require('electron');  // ← IMPORTANTE: Importar app
+const { app } = require('electron');
 
 class MPRISService extends EventEmitter {
   constructor(mainWindow) {
@@ -11,42 +11,32 @@ class MPRISService extends EventEmitter {
     this.currentPosition = 0;
     this.duration = 0;
     
-    // Pequeño delay para asegurar que D-Bus está listo
     setTimeout(() => {
       this.setupMPRIS();
-    }, 100);
+    }, 500); // Aumentar delay para asegurar que todo está listo
   }
 
   setupMPRIS() {
     try {
-      // Registrar el servicio MPRIS
       const dbus = require('dbus-native');
       const sessionBus = dbus.sessionBus();
       
       const serviceName = 'org.mpris.MediaPlayer2.jearcast';
       const objectPath = '/org/mpris/MediaPlayer2';
-      const interfaceName = 'org.mpris.MediaPlayer2';
-      const playerInterface = 'org.mpris.MediaPlayer2.Player';
       
-      sessionBus.requestName(serviceName, 0x4, (err, ret) => {
-        if (err) {
-          console.error('Error registrando MPRIS:', err);
-          return;
-        }
-        console.log('MPRIS service registrado:', serviceName);
-      });
-      
-      // Exponer interfaces
+      // Crear el objeto de servicio
       const serviceObject = {
         'org.mpris.MediaPlayer2': {
           Raise: () => {
+            console.log('MPRIS: Raise');
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.show();
               this.mainWindow.focus();
             }
           },
           Quit: () => {
-            app.quit();  // ← Ahora app está definida
+            console.log('MPRIS: Quit');
+            app.quit();
           },
           CanQuit: true,
           CanRaise: true,
@@ -96,9 +86,6 @@ class MPRISService extends EventEmitter {
           GetPosition: () => {
             return this.currentPosition * 1000000;
           },
-          Position: () => {
-            return this.currentPosition * 1000000;
-          },
           Seek: (offset) => {
             const newPosition = Math.max(0, Math.min(this.duration, this.currentPosition + offset / 1000000));
             console.log('MPRIS: Seek to', newPosition);
@@ -119,40 +106,65 @@ class MPRISService extends EventEmitter {
         }
       };
       
-      // Propiedades con getters
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'PlaybackStatus', {
-        get: () => this.playbackState
+      // Añadir propiedades dinámicas
+      const playerProps = serviceObject['org.mpris.MediaPlayer2.Player'];
+      
+      Object.defineProperty(playerProps, 'PlaybackStatus', {
+        get: () => this.playbackState,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'Metadata', {
-        get: () => this.metadata
+      Object.defineProperty(playerProps, 'Metadata', {
+        get: () => this.metadata,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'CanGoNext', {
-        get: () => true
+      Object.defineProperty(playerProps, 'CanGoNext', {
+        get: () => true,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'CanGoPrevious', {
-        get: () => true
+      Object.defineProperty(playerProps, 'CanGoPrevious', {
+        get: () => true,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'CanPlay', {
-        get: () => true
+      Object.defineProperty(playerProps, 'CanPlay', {
+        get: () => true,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'CanPause', {
-        get: () => true
+      Object.defineProperty(playerProps, 'CanPause', {
+        get: () => true,
+        enumerable: true
       });
       
-      Object.defineProperty(serviceObject['org.mpris.MediaPlayer2.Player'], 'CanSeek', {
-        get: () => true
+      Object.defineProperty(playerProps, 'CanSeek', {
+        get: () => true,
+        enumerable: true
       });
       
-      // Exportar el objeto al bus D-Bus
-      sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2'], objectPath, interfaceName);
-      sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, playerInterface);
+      Object.defineProperty(playerProps, 'Volume', {
+        get: () => 1.0,
+        set: (vol) => {},
+        enumerable: true
+      });
       
-      console.log('MPRIS interfaces exportadas correctamente');
+      // Registrar el nombre en el bus
+      sessionBus.requestName(serviceName, 0x4, (err, ret) => {
+        if (err) {
+          console.error('Error registrando MPRIS:', err);
+          return;
+        }
+        console.log('MPRIS service registrado:', serviceName);
+        
+        // Exportar interfaces DESPUÉS de registrar el nombre
+        sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2'], objectPath, 'org.mpris.MediaPlayer2');
+        sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, 'org.mpris.MediaPlayer2.Player');
+        
+        console.log('MPRIS interfaces exportadas correctamente');
+      });
+      
     } catch (error) {
       console.error('Error configurando MPRIS:', error);
     }
@@ -162,14 +174,14 @@ class MPRISService extends EventEmitter {
     const newState = state === 'playing' ? 'Playing' : state === 'paused' ? 'Paused' : 'Stopped';
     if (this.playbackState !== newState) {
       this.playbackState = newState;
-      console.log('MPRIS: PlaybackState cambiado a', newState);
-      this.emit('property-changed', 'PlaybackStatus', newState);
+      console.log('MPRIS: PlaybackState ->', newState);
+      // Emitir cambio de propiedad si es necesario
     }
   }
   
   updateMetadata({ title, artist, thumbnail, duration }) {
     this.duration = duration || 0;
-    const newMetadata = {
+    this.metadata = {
       'xesam:title': title || '',
       'xesam:artist': [artist || 'Unknown'],
       'xesam:album': 'JearCast Player',
@@ -177,16 +189,11 @@ class MPRISService extends EventEmitter {
       'mpris:length': (duration || 0) * 1000000,
       'mpris:artUrl': thumbnail || ''
     };
-    
-    this.metadata = newMetadata;
-    console.log('MPRIS: Metadata actualizada:', title);
-    this.emit('property-changed', 'Metadata', newMetadata);
+    console.log('MPRIS: Metadata actualizada -', title);
   }
   
   updatePosition(position) {
     this.currentPosition = position || 0;
-    // No emitir cada posición para no saturar
-    // this.emit('property-changed', 'Position', position * 1000000);
   }
 }
 

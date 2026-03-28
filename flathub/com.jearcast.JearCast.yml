@@ -47,10 +47,21 @@ modules:
       # Copiar el contenido del build de electron
       - cp -r dist_electron/linux-unpacked/* /app/lib/jearcast/
       
-      # COPIAR yt-dlp al directorio correcto
+      # COPIAR yt-dlp a MULTIPLES ubicaciones para asegurar que funcione
+      # Ubicación 1: En la raíz de la app (para desarrollo directo)
       - mkdir -p /app/lib/jearcast/bin
       - cp bin/yt-dlp /app/lib/jearcast/bin/yt-dlp
       - chmod +x /app/lib/jearcast/bin/yt-dlp
+      
+      # Ubicación 2: Dentro del ASAR (para cuando el código busca en resources/app.asar/)
+      - mkdir -p /app/lib/jearcast/resources/bin
+      - cp bin/yt-dlp /app/lib/jearcast/resources/bin/yt-dlp
+      - chmod +x /app/lib/jearcast/resources/bin/yt-dlp
+      
+      # Ubicación 3: Dentro de src (por si la ruta __dirname apunta a src/)
+      - mkdir -p /app/lib/jearcast/resources/app.asar.unpacked/bin
+      - cp bin/yt-dlp /app/lib/jearcast/resources/app.asar.unpacked/bin/yt-dlp
+      - chmod +x /app/lib/jearcast/resources/app.asar.unpacked/bin/yt-dlp
       
       # Instalar wrapper
       - install -Dm755 flathub/jearcast-wrapper /app/bin/jearcast-wrapper
@@ -70,12 +81,21 @@ modules:
       # Asegurar permisos
       - chmod +x /app/lib/jearcast/jearcast
       
-      # Verificar que yt-dlp está en el lugar correcto
+      # Verificar que yt-dlp está en todas las ubicaciones
       - echo "=== Verificando yt-dlp ==="
+      - echo "=== Ubicación 1: /app/lib/jearcast/bin/ ==="
       - ls -la /app/lib/jearcast/bin/ || echo "bin no existe"
-      - test -f /app/lib/jearcast/bin/yt-dlp && echo "yt-dlp encontrado" || echo "yt-dlp NO encontrado"
+      - test -f /app/lib/jearcast/bin/yt-dlp && echo "yt-dlp encontrado en /app/lib/jearcast/bin/" || echo "yt-dlp NO encontrado en /app/lib/jearcast/bin/"
       
-      # Debug: verificar estructura
+      - echo "=== Ubicación 2: /app/lib/jearcast/resources/bin/ ==="
+      - ls -la /app/lib/jearcast/resources/bin/ || echo "resources/bin no existe"
+      - test -f /app/lib/jearcast/resources/bin/yt-dlp && echo "yt-dlp encontrado en /app/lib/jearcast/resources/bin/" || echo "yt-dlp NO encontrado en /app/lib/jearcast/resources/bin/"
+      
+      - echo "=== Ubicación 3: /app/lib/jearcast/resources/app.asar.unpacked/bin/ ==="
+      - ls -la /app/lib/jearcast/resources/app.asar.unpacked/bin/ || echo "app.asar.unpacked/bin no existe"
+      - test -f /app/lib/jearcast/resources/app.asar.unpacked/bin/yt-dlp && echo "yt-dlp encontrado en app.asar.unpacked/bin/" || echo "yt-dlp NO encontrado en app.asar.unpacked/bin/"
+      
+      # Debug: verificar estructura general
       - echo "=== Estructura de /app/lib/jearcast ==="
       - ls -la /app/lib/jearcast/
       - echo "=== Estructura de /app/lib/jearcast/resources ==="
