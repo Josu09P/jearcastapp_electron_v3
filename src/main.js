@@ -30,8 +30,6 @@ const supportedFormats = [
   ".opus",
 ];
 
-// main.js - Agregar al principio
-const { app, BrowserWindow, ipcMain, dialog, Menu, globalShortcut } = require("electron");
 const { MPRISService } = require('./services/MPRISService');
 
 let mprisService = null;
