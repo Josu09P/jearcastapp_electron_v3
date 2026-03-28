@@ -12,12 +12,17 @@ const fs = require("fs");
 const { promisify } = require("util");
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
-const { DownloadService } = require("./services/downloadService");
-const { AudioService } = require("./services/AudioService");
+
+// ✅ CORREGIDO: Usar path.join con __dirname para rutas absolutas dentro del ASAR
+const servicesPath = path.join(__dirname, 'services');
+const { DownloadService } = require(path.join(servicesPath, 'downloadService'));
+const { AudioService } = require(path.join(servicesPath, 'AudioService'));
+const { MPRISService } = require(path.join(servicesPath, 'MPRISService'));
 
 let mainWindow;
 let downloadService;
 let audioService = null;
+let mprisService = null;
 
 // ==================== FUNCIONES DE MÚSICA LOCAL ====================
 const supportedFormats = [
@@ -29,22 +34,6 @@ const supportedFormats = [
   ".aac",
   ".opus",
 ];
-
-const { MPRISService } = require('./services/MPRISService');
-
-let mprisService = null;
-
-// En createWindow(), después de crear mainWindow
-mprisService = new MPRISService(mainWindow);
-
-// Escuchar cambios de estado
-ipcMain.on('player-state-change', (event, { state, title, artist, thumbnail, duration, position }) => {
-  if (mprisService) {
-    mprisService.updateMetadata({ title, artist, thumbnail, duration });
-    mprisService.updatePlaybackState(state);
-    mprisService.updatePosition(position);
-  }
-});
 
 async function scanMusicFolder(folderPath) {
   const musicFiles = [];
@@ -86,10 +75,8 @@ function setupMediaKeys() {
     globalShortcut.unregisterAll();
   } catch (e) {}
 
-  // Registrar teclas multimedia validas
   const registeredKeys = [];
 
-  // Tecla Play/Pause
   const playPauseRegistered = globalShortcut.register("MediaPlayPause", () => {
     console.log("MediaPlayPause presionada");
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -98,7 +85,6 @@ function setupMediaKeys() {
   });
   if (playPauseRegistered) registeredKeys.push("MediaPlayPause");
 
-  // Tecla Siguiente
   const nextRegistered = globalShortcut.register("MediaNextTrack", () => {
     console.log("MediaNextTrack presionada");
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -107,7 +93,6 @@ function setupMediaKeys() {
   });
   if (nextRegistered) registeredKeys.push("MediaNextTrack");
 
-  // Tecla Anterior
   const prevRegistered = globalShortcut.register("MediaPreviousTrack", () => {
     console.log("MediaPreviousTrack presionada");
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -116,7 +101,6 @@ function setupMediaKeys() {
   });
   if (prevRegistered) registeredKeys.push("MediaPreviousTrack");
 
-  // Teclas de función como fallback (F7, F8, F9)
   const f7Registered = globalShortcut.register("F7", () => {
     console.log("F7 presionada (prev)");
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -156,9 +140,7 @@ function createWindow() {
   expressApp.use(express.json());
 
   const server = expressApp.listen(3353, "127.0.0.1", () => {
-    console.log(
-      "Servidor interno de JearCast corriendo en http://localhost:3353",
-    );
+    console.log("Servidor interno de JearCast corriendo en http://localhost:3353");
 
     mainWindow = new BrowserWindow({
       width: 1400,
@@ -240,6 +222,18 @@ function createWindow() {
 
     downloadService = new DownloadService();
     audioService = new AudioService();
+    
+    // ✅ Inicializar MPRISService DESPUÉS de crear mainWindow
+    mprisService = new MPRISService(mainWindow);
+    
+    // ✅ Configurar listener de cambios de estado
+    ipcMain.on('player-state-change', (event, { state, title, artist, thumbnail, duration, position }) => {
+      if (mprisService) {
+        mprisService.updateMetadata({ title, artist, thumbnail, duration });
+        mprisService.updatePlaybackState(state);
+        mprisService.updatePosition(position);
+      }
+    });
 
     if (audioService) {
       audioService.on("ended", () => {
@@ -259,6 +253,7 @@ function createWindow() {
 
     console.log("Servicio de descargas inicializado");
     console.log("Servicio de audio inicializado");
+    console.log("Servicio MPRIS inicializado");
   });
 }
 
