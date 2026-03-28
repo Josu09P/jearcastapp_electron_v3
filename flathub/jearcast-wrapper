@@ -1,6 +1,34 @@
 #!/bin/sh
-# Nos movemos a la raíz donde está el package.json de la app
+
+# Cambiar al directorio de la aplicación
 cd /app/lib/jearcast/resources/app/
 
-# Ejecutamos pasando la ruta relativa al main.js configurado en package.json
-exec /app/lib/jearcast/jearcast --no-sandbox src/main.js "$@"
+# Procesar argumentos de línea de comandos para acciones MPRIS
+case "$1" in
+  --play-pause)
+    # Enviar señal al proceso en ejecución
+    if [ -f /tmp/jearcast.pid ]; then
+      kill -USR1 $(cat /tmp/jearcast.pid)
+    fi
+    exit 0
+    ;;
+  --next)
+    if [ -f /tmp/jearcast.pid ]; then
+      kill -USR2 $(cat /tmp/jearcast.pid)
+    fi
+    exit 0
+    ;;
+  --previous)
+    if [ -f /tmp/jearcast.pid ]; then
+      kill -USR3 $(cat /tmp/jearcast.pid)
+    fi
+    exit 0
+    ;;
+esac
+
+# Ejecutar la aplicación y guardar el PID
+exec /app/lib/jearcast/jearcast --no-sandbox src/main.js "$@" &
+PID=$!
+echo $PID > /tmp/jearcast.pid
+wait $PID
+rm -f /tmp/jearcast.pid
