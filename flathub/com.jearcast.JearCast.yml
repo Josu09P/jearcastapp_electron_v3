@@ -44,8 +44,13 @@ modules:
       - mkdir -p /app/share/metainfo
       - mkdir -p /app/share/icons/hicolor
       
-      # Copiar TODO el contenido de dist_electron/linux-unpacked a /app/lib/jearcast/
+      # Copiar el contenido del build de electron
       - cp -r dist_electron/linux-unpacked/* /app/lib/jearcast/
+      
+      # COPIAR yt-dlp al directorio correcto
+      - mkdir -p /app/lib/jearcast/bin
+      - cp bin/yt-dlp /app/lib/jearcast/bin/yt-dlp
+      - chmod +x /app/lib/jearcast/bin/yt-dlp
       
       # Instalar wrapper
       - install -Dm755 flathub/jearcast-wrapper /app/bin/jearcast-wrapper
@@ -64,6 +69,11 @@ modules:
       
       # Asegurar permisos
       - chmod +x /app/lib/jearcast/jearcast
+      
+      # Verificar que yt-dlp está en el lugar correcto
+      - echo "=== Verificando yt-dlp ==="
+      - ls -la /app/lib/jearcast/bin/ || echo "bin no existe"
+      - test -f /app/lib/jearcast/bin/yt-dlp && echo "yt-dlp encontrado" || echo "yt-dlp NO encontrado"
       
       # Debug: verificar estructura
       - echo "=== Estructura de /app/lib/jearcast ==="

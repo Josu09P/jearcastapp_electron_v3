@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld("electron", {
   cancelDownload: (downloadId) => ipcRenderer.invoke("cancel-download", downloadId),
   getDownloadedFiles: () => ipcRenderer.invoke("get-downloaded-files"),
 
-  // Escuchar progreso - ✅ CORREGIDO
+  // Escuchar progreso - CORREGIDO
   onDownloadProgress: (callback) => {
     ipcRenderer.on("download-progress", (event, data) => callback(data));
   },
@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld("electron", {
   maximize: () => ipcRenderer.send("window-toggle-maximize"),
   close: () => ipcRenderer.send("window-close"),
 
-  // ✅ EXPONER ipcRenderer COMPLETO con todos los métodos
+  // EXPONER ipcRenderer COMPLETO con todos los métodos
   ipcRenderer: {
     send: (channel, data) => ipcRenderer.send(channel, data),
     on: (channel, callback) => ipcRenderer.on(channel, (event, ...args) => callback(...args)),

@@ -18,7 +18,8 @@
       "src/main.js",
       "src/preload.js",
       "src/jearcast-view/dist/**/*",
-      "src/services/**/*"
+      "src/services/**/*",
+      "bin/yt-dlp"
     ],
     "linux": {
       "target": [
