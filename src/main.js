@@ -143,8 +143,8 @@ function createWindow() {
     console.log("Servidor interno de JearCast corriendo en http://localhost:3353");
 
     mainWindow = new BrowserWindow({
-      width: 1400,
-      height: 800,
+      width: 1200,
+      height: 650,
       resizable: true,
       frame: false,
       title: "JearCast",
