@@ -3,16 +3,17 @@
   <id>com.jearcast.JearCast</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>JearCast Player</name>
+  <name>JearCastMusic</name>
   <summary>Tu reproductor de música moderno</summary>
   <description>
-    <p>JearCast es una aplicación de escritorio diseñada para entusiastas de la música que buscan una interfaz limpia y conexión con Firebase. Disfruta de tus canciones favoritas con controles multimedia integrados y ecualizador.</p>
+    <p>JearCast es una aplicación de escritorio diseñada para entusiastas de la música que buscan una interfaz limpia y moderna. Disfruta de tus canciones favoritas con controles multimedia integrados y ecualizador.</p>
     <p>Características principales:</p>
     <ul>
-      <li>Reproducción de música desde YouTube</li>
+      <li>Reproducción de música desde YT sin anuncion</li>
       <li>Letras sincronizadas</li>
       <li>Ecualizador con presets</li>
       <li>Controles multimedia (MPRIS)</li>
+      <li>Cuenta propia</li>      
       <li>Descarga de canciones</li>
     </ul>
   </description>
@@ -31,17 +32,20 @@
     <category>Music</category>
   </categories>
   <content_rating type="oars-1.1" />
-  <developer_name>Josué Elías Algarate Rubio</developer_name>
+  <developer_name>Josue Algarate</developer_name>
   <project_group>JearCast</project_group>
   <releases>
-    <release version="1.0.0" date="2024-03-28">
+    <release version="1.2" date="2026-03-28">
       <description>
-        <p>Primera versión estable</p>
+        <p>Primera versión en la tienda de flathub</p>
         <ul>
           <li>Reproducción de YouTube</li>
           <li>Letras sincronizadas</li>
           <li>Ecualizador</li>
           <li>Soporte MPRIS</li>
+          <li>Descargar musica</li>
+          <li>Escuchar musica local</li>
+          <li>Temas de la app y la animacion del miniplayer</li>
         </ul>
       </description>
     </release>
