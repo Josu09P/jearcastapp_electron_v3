@@ -44,10 +44,10 @@ modules:
       - mkdir -p /app/share/metainfo
       - mkdir -p /app/share/icons/hicolor
       
-      # Copiar todo el contenido de dist_electron/linux-unpacked a /app/lib/jearcast/
+      # Copiar TODO el contenido de dist_electron/linux-unpacked a /app/lib/jearcast/
       - cp -r dist_electron/linux-unpacked/* /app/lib/jearcast/
       
-      # Instalar wrapper en /app/bin
+      # Instalar wrapper
       - install -Dm755 flathub/jearcast-wrapper /app/bin/jearcast-wrapper
       
       # Instalar archivos desktop y metainfo
@@ -62,8 +62,14 @@ modules:
           fi
         done
       
-      # Crear enlace simbólico para el ejecutable si es necesario
+      # Asegurar permisos
       - chmod +x /app/lib/jearcast/jearcast
+      
+      # Debug: verificar estructura
+      - echo "=== Estructura de /app/lib/jearcast ==="
+      - ls -la /app/lib/jearcast/
+      - echo "=== Estructura de /app/lib/jearcast/resources ==="
+      - ls -la /app/lib/jearcast/resources/ || echo "No existe resources/"
     sources:
       - type: git
         url: https://github.com/Josu09P/jearcastapp_electron_v3.git
