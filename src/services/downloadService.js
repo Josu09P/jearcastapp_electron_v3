@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { promisify } = require("util");
 const axios = require("axios");
+const { app } = require("electron");
 
 const execPromise = promisify(exec);
 
@@ -21,23 +22,14 @@ class DownloadService {
     this.downloadsPath = path.join(downloadsDir, "JearCast");
     this.activeDownloads = new Map();
     
-    // Detectar si estamos en Flatpak
     const isFlatpak = !!process.env.FLATPAK_ID;
     
-    // Ruta para Flathub (sistema de archivos de solo lectura)
     if (isFlatpak) {
-      // __dirname = /app/lib/jearcast/resources/app.asar/src/
-      // .. = /app/lib/jearcast/resources/app.asar/
-      // .. = /app/lib/jearcast/resources/
-      // .. = /app/lib/jearcast/
-      // /bin/yt-dlp
       this.ytDlpPath = path.join(__dirname, "..", "..", "..", "bin", "yt-dlp");
     } else {
-      // Desarrollo local
       this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
     }
     
-    // Fallback con process.resourcesPath
     if (!fs.existsSync(this.ytDlpPath) && process.resourcesPath) {
       const fallbackPath = path.join(process.resourcesPath, "..", "bin", "yt-dlp");
       if (fs.existsSync(fallbackPath)) {
@@ -51,7 +43,6 @@ class DownloadService {
 
     if (!fs.existsSync(this.ytDlpPath)) {
       console.error("yt-dlp no encontrado en:", this.ytDlpPath);
-      // Buscar en ubicaciones alternativas
       const altPaths = [
         "/app/lib/jearcast/bin/yt-dlp",
         "/app/lib/jearcast/resources/bin/yt-dlp",
@@ -68,7 +59,6 @@ class DownloadService {
       }
     }
     
-    // Solo intentar chmod si NO estamos en Flatpak (sistema de archivos editable)
     if (fs.existsSync(this.ytDlpPath)) {
       console.log("yt-dlp disponible en:", this.ytDlpPath);
       if (!isFlatpak) {
@@ -96,22 +86,14 @@ class DownloadService {
 
   async getVideoInfo(videoId) {
     try {
-      if (
-        !videoId ||
-        videoId.length !== 11 ||
-        !/^[a-zA-Z0-9_-]+$/.test(videoId)
-      ) {
+      if (!videoId || videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
         throw new Error(`ID de video invalido: ${videoId}`);
       }
-
       console.log(`Obteniendo info para videoId: ${videoId}`);
-
       const url = `https://www.youtube.com/watch?v=${videoId}`;
       const command = `"${this.ytDlpPath}" --dump-json "${url}"`;
-
       const { stdout } = await execPromise(command, { timeout: 30000 });
       const info = JSON.parse(stdout);
-
       return {
         videoId: info.id,
         title: info.title,
@@ -127,9 +109,7 @@ class DownloadService {
       };
     } catch (error) {
       console.error("Error obteniendo info:", error.message);
-      throw new Error(
-        `No se pudo obtener informacion del video: ${error.message}`,
-      );
+      throw new Error(`No se pudo obtener informacion del video: ${error.message}`);
     }
   }
 
@@ -140,20 +120,12 @@ class DownloadService {
         url: thumbnailUrl,
         responseType: "stream",
         timeout: 10000,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
+        headers: { "User-Agent": "Mozilla/5.0" },
       });
-
       const writer = fs.createWriteStream(outputPath);
       response.data.pipe(writer);
-
       return new Promise((resolve, reject) => {
-        writer.on("finish", () => {
-          console.log(`Thumbnail descargado`);
-          resolve(true);
-        });
+        writer.on("finish", () => { console.log(`Thumbnail descargado`); resolve(true); });
         writer.on("error", reject);
       });
     } catch (error) {
@@ -170,11 +142,7 @@ class DownloadService {
         return;
       }
 
-      const metadataFile = path.join(
-        this.downloadsPath,
-        `metadata_${Date.now()}.txt`,
-      );
-
+      const metadataFile = path.join(this.downloadsPath, `metadata_${Date.now()}.txt`);
       const metadataContent = `;FFMETADATA1
 title=${videoInfo.title}
 artist=${videoInfo.author}
@@ -185,32 +153,29 @@ comment=Descargado con JearCast Music Player
 
       try {
         fs.writeFileSync(metadataFile, metadataContent, "utf8");
-
         const tempOutput = mp3Path.replace(".mp3", "_temp.mp3");
 
         const ffmpeg = require("fluent-ffmpeg");
-        const ffmpegStatic = require("@ffmpeg-installer/ffmpeg");
-        ffmpeg.setFfmpegPath(ffmpegStatic.path);
-
-        console.log("Incrustando portada y metadatos...");
+        const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
+        
+        // CORRECCIÓN RUTA FFmpeg para ASAR / FLATPAK
+        let ffmpegPath = ffmpegInstaller.path;
+        if (app.isPackaged) {
+            // Cambiamos la ruta para que busque en la carpeta descomprimida (unpacked)
+            ffmpegPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+        }
+        
+        ffmpeg.setFfmpegPath(ffmpegPath);
+        console.log("Incrustando portada usando FFmpeg en:", ffmpegPath);
 
         ffmpeg()
           .input(mp3Path)
           .input(thumbnailPath)
           .input(metadataFile)
           .outputOptions([
-            "-map",
-            "0:a",
-            "-map",
-            "1:v",
-            "-map_metadata",
-            "2",
-            "-c",
-            "copy",
-            "-id3v2_version",
-            "3",
-            "-disposition:v:0",
-            "attached_pic",
+            "-map", "0:a", "-map", "1:v", "-map_metadata", "2",
+            "-c", "copy", "-id3v2_version", "3",
+            "-disposition:v:0", "attached_pic",
           ])
           .output(tempOutput)
           .on("end", () => {
@@ -218,16 +183,12 @@ comment=Descargado con JearCast Music Player
               fs.renameSync(tempOutput, mp3Path);
               console.log("Portada y metadatos incrustados correctamente");
             }
-            try {
-              fs.unlinkSync(metadataFile);
-            } catch (e) {}
+            try { fs.unlinkSync(metadataFile); } catch (e) {}
             resolve();
           })
           .on("error", (err) => {
             console.error("Error en ffmpeg:", err.message);
-            try {
-              fs.unlinkSync(metadataFile);
-            } catch (e) {}
+            try { fs.unlinkSync(metadataFile); } catch (e) {}
             resolve();
           })
           .run();
@@ -254,12 +215,7 @@ comment=Descargado con JearCast Music Player
     }
   }
 
-  async downloadAudio(
-    videoId,
-    title,
-    quality = 320,
-    providedDownloadId = null,
-  ) {
+  async downloadAudio(videoId, title, quality = 320, providedDownloadId = null) {
     const downloadId = providedDownloadId || `${videoId}_${Date.now()}`;
 
     return new Promise(async (resolve, reject) => {
@@ -270,20 +226,10 @@ comment=Descargado con JearCast Music Player
 
       try {
         this.emitProgress(downloadId, 0, "starting");
-
         videoInfo = await this.getVideoInfo(videoId);
         const sanitizedTitle = this.sanitizeFilename(videoInfo.title);
-        finalPath = path.join(
-          this.downloadsPath,
-          `${sanitizedTitle}_${quality}kbps.mp3`,
-        );
-        thumbnailPath = path.join(
-          this.downloadsPath,
-          `${sanitizedTitle}_cover.jpg`,
-        );
-
-        console.log(`\nDescargando: ${videoInfo.title}`);
-        console.log(`ID: ${downloadId}\n`);
+        finalPath = path.join(this.downloadsPath, `${sanitizedTitle}_${quality}kbps.mp3`);
+        thumbnailPath = path.join(this.downloadsPath, `${sanitizedTitle}_cover.jpg`);
 
         this.emitProgress(downloadId, 5, "downloading_thumbnail");
         await this.downloadThumbnail(videoInfo.thumbnail, thumbnailPath);
@@ -292,10 +238,7 @@ comment=Descargado con JearCast Music Player
         const url = `https://www.youtube.com/watch?v=${videoId}`;
         const command = `"${this.ytDlpPath}" -f bestaudio --extract-audio --audio-format mp3 --audio-quality ${quality}k -o "${finalPath}" "${url}"`;
 
-        console.log("Descargando audio...");
-
         let lastPercent = 0;
-
         childProcess = exec(command);
 
         this.activeDownloads.set(downloadId, {
@@ -306,172 +249,67 @@ comment=Descargado con JearCast Music Player
           cancelled: false,
         });
 
-        console.log(
-          `Proceso guardado en activeDownloads. Total activos: ${this.activeDownloads.size}`,
-        );
-
-        childProcess.on("exit", (code, signal) => {
-          console.log(
-            `Proceso ${downloadId} termino con codigo: ${code}, senal: ${signal}`,
-          );
-        });
-
-        childProcess.on("error", (error) => {
-          console.error(`Error en proceso ${downloadId}:`, error.message);
-        });
-
         childProcess.stderr?.on("data", (data) => {
           const output = data.toString();
-
           let percent = null;
           const match = output.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
-          if (match) {
-            percent = parseFloat(match[1]);
-          }
+          if (match) percent = parseFloat(match[1]);
 
           if (percent !== null && percent !== lastPercent) {
-            const mappedPercent = Math.min(
-              99,
-              Math.max(10, 10 + percent * 0.75),
-            );
+            const mappedPercent = Math.min(99, Math.max(10, 10 + percent * 0.85));
             lastPercent = mappedPercent;
-            this.emitProgress(
-              downloadId,
-              Math.round(mappedPercent),
-              "downloading",
-            );
-            process.stdout.write(
-              `\rProgreso: ${Math.round(percent)}% -> ${Math.round(mappedPercent)}% total`,
-            );
+            this.emitProgress(downloadId, Math.round(mappedPercent), "downloading");
           }
         });
 
         childProcess.on("close", async (code) => {
-          console.log(`Proceso ${downloadId} cerrado con codigo: ${code}`);
-
           const download = this.activeDownloads.get(downloadId);
-          const wasCancelled = download?.cancelled === true;
-
-          if (wasCancelled) {
-            console.log(`Descarga ${downloadId} cancelada por el usuario`);
+          if (download?.cancelled) {
             this.emitProgress(downloadId, 0, "cancelled");
             this.activeDownloads.delete(downloadId);
-            resolve({
-              success: false,
-              cancelled: true,
-              message: "Descarga cancelada por el usuario",
-            });
+            resolve({ success: false, cancelled: true });
             return;
           }
 
           if (code !== 0 && code !== null) {
-            console.error(`Error en descarga ${downloadId}, codigo: ${code}`);
             this.emitProgress(downloadId, 0, "error");
             this.activeDownloads.delete(downloadId);
-            reject(new Error(`Descarga cancelada, termino con codigo ${code}`));
+            reject(new Error(`Error codigo ${code}`));
             return;
           }
 
           if (fs.existsSync(finalPath)) {
-            console.log("Audio descargado correctamente");
-
             this.emitProgress(downloadId, 90, "processing");
-
             if (fs.existsSync(thumbnailPath)) {
-              await this.embedThumbnailToMp3(
-                finalPath,
-                thumbnailPath,
-                videoInfo,
-              );
-              try {
-                fs.unlinkSync(thumbnailPath);
-              } catch (e) {}
+              await this.embedThumbnailToMp3(finalPath, thumbnailPath, videoInfo);
+              try { fs.unlinkSync(thumbnailPath); } catch (e) {}
             }
-
             this.emitProgress(downloadId, 100, "completed");
-
-            console.log("\nDescarga completada exitosamente!");
-            console.log(`Ubicacion: ${finalPath}`);
-            console.log(`Titulo: ${videoInfo.title}`);
-            console.log(`Artista: ${videoInfo.author}\n`);
-
             this.activeDownloads.delete(downloadId);
-            resolve({
-              success: true,
-              path: finalPath,
-              info: {
-                title: videoInfo.title,
-                artist: videoInfo.author,
-                duration: videoInfo.duration,
-                size: fs.statSync(finalPath).size,
-                quality: quality,
-              },
-            });
+            resolve({ success: true, path: finalPath, info: videoInfo });
           } else {
-            this.emitProgress(downloadId, 0, "error");
-            this.activeDownloads.delete(downloadId);
-            reject(new Error("No se encontro el archivo descargado"));
+            reject(new Error("Archivo no encontrado"));
           }
         });
       } catch (error) {
-        console.error("Error en descarga:", error.message);
         this.emitProgress(downloadId, 0, "error");
-        if (childProcess) {
-          childProcess.kill();
-        }
+        if (childProcess) childProcess.kill();
         this.activeDownloads.delete(downloadId);
-        reject(new Error(`Error en descarga: ${error.message}`));
+        reject(error);
       }
     });
   }
 
   cancelDownload(downloadId) {
-    console.log(`Intentando cancelar descarga: ${downloadId}`);
-    console.log(`Descargas activas:`, Array.from(this.activeDownloads.keys()));
-
     const download = this.activeDownloads.get(downloadId);
-
     if (download && download.process) {
-      console.log(`Proceso encontrado, terminando...`);
-
       download.cancelled = true;
-
-      try {
-        download.process.kill("SIGTERM");
-
-        setTimeout(() => {
-          try {
-            if (download.process && !download.process.killed) {
-              download.process.kill("SIGKILL");
-              console.log(`Proceso ${downloadId} forzado con SIGKILL`);
-            }
-          } catch (e) {
-            console.error("Error forzando kill:", e);
-          }
-        }, 2000);
-      } catch (error) {
-        console.error(`Error matando proceso ${downloadId}:`, error.message);
-        try {
-          download.process.kill("SIGKILL");
-        } catch (e) {}
-      }
-
-      setTimeout(() => {
-        this.activeDownloads.delete(downloadId);
-        console.log(`Descarga ${downloadId} eliminada del registro`);
-      }, 500);
-
+      download.process.kill("SIGTERM");
+      this.activeDownloads.delete(downloadId);
       this.emitProgress(downloadId, 0, "cancelled");
-
       return true;
-    } else {
-      console.log(`No se encontro proceso para downloadId: ${downloadId}`);
-      return false;
     }
-  }
-
-  delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return false;
   }
 }
 

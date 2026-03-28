@@ -10,6 +10,10 @@
   "build": {
     "appId": "com.jearcast.JearCast",
     "productName": "JearCast Player",
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/@ffmpeg-installer/ffmpeg/**/*"
+    ],
     "directories": {
       "output": "dist_electron",
       "buildResources": "build"
