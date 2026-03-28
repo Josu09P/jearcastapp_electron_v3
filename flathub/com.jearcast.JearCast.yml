@@ -24,13 +24,13 @@ finish-args:
   - --socket=pulseaudio
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
+  # Permiso para comunicarse con el bus de mensajes
   - --talk-name=org.freedesktop.DBus
-  - --talk-name=org.mpris.MediaPlayer2
+  # ESTE ES EL VITAL: Permite que tu app registre los controles en el sistema
   - --own-name=org.mpris.MediaPlayer2.jearcast
   - --filesystem=xdg-music:ro
   - --filesystem=xdg-download
   - --filesystem=~/.local/share/jearcast:create
-  - --system-talk-name=org.freedesktop.DBus
   
 modules:
   - name: jearcast

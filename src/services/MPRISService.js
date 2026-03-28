@@ -156,13 +156,13 @@ class MPRISService extends EventEmitter {
           console.error('Error registrando MPRIS:', err);
           return;
         }
-        console.log('MPRIS service registrado:', serviceName);
         
-        // Exportar interfaces DESPUÉS de registrar el nombre
         sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2'], objectPath, 'org.mpris.MediaPlayer2');
         sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, 'org.mpris.MediaPlayer2.Player');
         
-        console.log('MPRIS interfaces exportadas correctamente');
+        // FORZAR NOTIFICACIÓN INICIAL:
+        // Esto le dice a GNOME "Hey, estoy aquí y estoy detenido"
+        this.updatePlaybackState('Stopped');
       });
       
     } catch (error) {
@@ -178,7 +178,18 @@ class MPRISService extends EventEmitter {
       // Emitir cambio de propiedad si es necesario
     }
   }
-  
+
+  /* TIP
+  updatePlaybackState(state) {
+  const newState = state === 'playing' ? 'Playing' : state === 'paused' ? 'Paused' : 'Stopped';
+  if (this.playbackState !== newState) {
+    this.playbackState = newState;
+    // Esto avisa a GNOME que refresque el icono del botón
+    this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 'PlaybackStatus': newState }, []);
+  }
+}
+  */
+ 
   updateMetadata({ title, artist, thumbnail, duration }) {
     this.duration = duration || 0;
     this.metadata = {

@@ -11,6 +11,7 @@ StartupNotify=true
 StartupWMClass=JearCast
 Keywords=music;player;youtube;audio;stream;
 Actions=PlayPause;Next;Previous;
+X-GNOME-UsesNotifications=true
 
 [Desktop Action PlayPause]
 Name=Play/Pause
