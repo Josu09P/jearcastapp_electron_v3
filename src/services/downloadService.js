@@ -20,9 +20,19 @@ class DownloadService {
 
     this.downloadsPath = path.join(downloadsDir, "JearCast");
     this.activeDownloads = new Map();
-    // EN DESARROLLO this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
-    // EN FLATHUB
-    this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
+    
+    // Ruta CORREGIDA para Flathub
+    // __dirname = /app/lib/jearcast/resources/app.asar/src/
+    // .. = /app/lib/jearcast/resources/app.asar/
+    // .. = /app/lib/jearcast/resources/
+    // .. = /app/lib/jearcast/
+    // /bin/yt-dlp
+    this.ytDlpPath = path.join(__dirname, "..", "..", "..", "bin", "yt-dlp");
+    
+    // Fallback con process.resourcesPath
+    if (!fs.existsSync(this.ytDlpPath) && process.resourcesPath) {
+      this.ytDlpPath = path.join(process.resourcesPath, "..", "bin", "yt-dlp");
+    }
 
     if (!fs.existsSync(this.downloadsPath)) {
       fs.mkdirSync(this.downloadsPath, { recursive: true });
@@ -32,7 +42,7 @@ class DownloadService {
       console.error("yt-dlp no encontrado en:", this.ytDlpPath);
     } else {
       fs.chmodSync(this.ytDlpPath, "755");
-      console.log("yt-dlp encontrado");
+      console.log("yt-dlp encontrado en:", this.ytDlpPath);
     }
 
     console.log("Directorio de descargas:", this.downloadsPath);
@@ -53,7 +63,7 @@ class DownloadService {
         videoId.length !== 11 ||
         !/^[a-zA-Z0-9_-]+$/.test(videoId)
       ) {
-        throw new Error(`ID de video inválido: ${videoId}`);
+        throw new Error(`ID de video invalido: ${videoId}`);
       }
 
       console.log(`Obteniendo info para videoId: ${videoId}`);
@@ -80,7 +90,7 @@ class DownloadService {
     } catch (error) {
       console.error("Error obteniendo info:", error.message);
       throw new Error(
-        `No se pudo obtener información del video: ${error.message}`,
+        `No se pudo obtener informacion del video: ${error.message}`,
       );
     }
   }
@@ -103,7 +113,7 @@ class DownloadService {
 
       return new Promise((resolve, reject) => {
         writer.on("finish", () => {
-          console.log(`humbnail descargado`);
+          console.log(`Thumbnail descargado`);
           resolve(true);
         });
         writer.on("error", reject);
@@ -264,7 +274,7 @@ comment=Descargado con JearCast Music Player
 
         childProcess.on("exit", (code, signal) => {
           console.log(
-            `Proceso ${downloadId} terminó con código: ${code}, señal: ${signal}`,
+            `Proceso ${downloadId} termino con codigo: ${code}, senal: ${signal}`,
           );
         });
 
@@ -293,13 +303,13 @@ comment=Descargado con JearCast Music Player
               "downloading",
             );
             process.stdout.write(
-              `\rProgreso: ${Math.round(percent)}% → ${Math.round(mappedPercent)}% total`,
+              `\rProgreso: ${Math.round(percent)}% -> ${Math.round(mappedPercent)}% total`,
             );
           }
         });
 
         childProcess.on("close", async (code) => {
-          console.log(`Proceso ${downloadId} cerrado con código: ${code}`);
+          console.log(`Proceso ${downloadId} cerrado con codigo: ${code}`);
 
           const download = this.activeDownloads.get(downloadId);
           const wasCancelled = download?.cancelled === true;
@@ -317,10 +327,10 @@ comment=Descargado con JearCast Music Player
           }
 
           if (code !== 0 && code !== null) {
-            console.error(`Error en descarga ${downloadId}, código: ${code}`);
+            console.error(`Error en descarga ${downloadId}, codigo: ${code}`);
             this.emitProgress(downloadId, 0, "error");
             this.activeDownloads.delete(downloadId);
-            reject(new Error(`Descarga cancelada, terminó con código ${code}`));
+            reject(new Error(`Descarga cancelada, termino con codigo ${code}`));
             return;
           }
 
@@ -342,9 +352,9 @@ comment=Descargado con JearCast Music Player
 
             this.emitProgress(downloadId, 100, "completed");
 
-            console.log("\n Descarga completada exitosamente!");
-            console.log(`Ubicación: ${finalPath}`);
-            console.log(`Título: ${videoInfo.title}`);
+            console.log("\nDescarga completada exitosamente!");
+            console.log(`Ubicacion: ${finalPath}`);
+            console.log(`Titulo: ${videoInfo.title}`);
             console.log(`Artista: ${videoInfo.author}\n`);
 
             this.activeDownloads.delete(downloadId);
@@ -362,7 +372,7 @@ comment=Descargado con JearCast Music Player
           } else {
             this.emitProgress(downloadId, 0, "error");
             this.activeDownloads.delete(downloadId);
-            reject(new Error("No se encontró el archivo descargado"));
+            reject(new Error("No se encontro el archivo descargado"));
           }
         });
       } catch (error) {
@@ -417,7 +427,7 @@ comment=Descargado con JearCast Music Player
 
       return true;
     } else {
-      console.log(`No se encontró proceso para downloadId: ${downloadId}`);
+      console.log(`No se encontro proceso para downloadId: ${downloadId}`);
       return false;
     }
   }
