@@ -24,12 +24,14 @@ finish-args:
   - --socket=pulseaudio
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.freedesktop.DBus
   - --talk-name=org.mpris.MediaPlayer2
   - --own-name=org.mpris.MediaPlayer2.jearcast
   - --filesystem=xdg-music:ro
   - --filesystem=xdg-download
   - --filesystem=~/.local/share/jearcast:create
-
+  - --system-talk-name=org.freedesktop.DBus
+  
 modules:
   - name: jearcast
     buildsystem: simple

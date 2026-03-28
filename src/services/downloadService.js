@@ -21,17 +21,28 @@ class DownloadService {
     this.downloadsPath = path.join(downloadsDir, "JearCast");
     this.activeDownloads = new Map();
     
-    // Ruta CORREGIDA para Flathub
-    // __dirname = /app/lib/jearcast/resources/app.asar/src/
-    // .. = /app/lib/jearcast/resources/app.asar/
-    // .. = /app/lib/jearcast/resources/
-    // .. = /app/lib/jearcast/
-    // /bin/yt-dlp
-    this.ytDlpPath = path.join(__dirname, "..", "..", "..", "bin", "yt-dlp");
+    // Detectar si estamos en Flatpak
+    const isFlatpak = !!process.env.FLATPAK_ID;
+    
+    // Ruta para Flathub (sistema de archivos de solo lectura)
+    if (isFlatpak) {
+      // __dirname = /app/lib/jearcast/resources/app.asar/src/
+      // .. = /app/lib/jearcast/resources/app.asar/
+      // .. = /app/lib/jearcast/resources/
+      // .. = /app/lib/jearcast/
+      // /bin/yt-dlp
+      this.ytDlpPath = path.join(__dirname, "..", "..", "..", "bin", "yt-dlp");
+    } else {
+      // Desarrollo local
+      this.ytDlpPath = path.join(__dirname, "..", "..", "bin", "yt-dlp");
+    }
     
     // Fallback con process.resourcesPath
     if (!fs.existsSync(this.ytDlpPath) && process.resourcesPath) {
-      this.ytDlpPath = path.join(process.resourcesPath, "..", "bin", "yt-dlp");
+      const fallbackPath = path.join(process.resourcesPath, "..", "bin", "yt-dlp");
+      if (fs.existsSync(fallbackPath)) {
+        this.ytDlpPath = fallbackPath;
+      }
     }
 
     if (!fs.existsSync(this.downloadsPath)) {
@@ -40,9 +51,36 @@ class DownloadService {
 
     if (!fs.existsSync(this.ytDlpPath)) {
       console.error("yt-dlp no encontrado en:", this.ytDlpPath);
+      // Buscar en ubicaciones alternativas
+      const altPaths = [
+        "/app/lib/jearcast/bin/yt-dlp",
+        "/app/lib/jearcast/resources/bin/yt-dlp",
+        path.join(__dirname, "..", "..", "bin", "yt-dlp"),
+        path.join(__dirname, "..", "..", "..", "bin", "yt-dlp"),
+      ];
+      
+      for (const altPath of altPaths) {
+        if (fs.existsSync(altPath)) {
+          this.ytDlpPath = altPath;
+          console.log("yt-dlp encontrado en ruta alternativa:", altPath);
+          break;
+        }
+      }
+    }
+    
+    // Solo intentar chmod si NO estamos en Flatpak (sistema de archivos editable)
+    if (fs.existsSync(this.ytDlpPath)) {
+      console.log("yt-dlp disponible en:", this.ytDlpPath);
+      if (!isFlatpak) {
+        try {
+          fs.chmodSync(this.ytDlpPath, "755");
+          console.log("Permisos de yt-dlp actualizados");
+        } catch (err) {
+          console.error("Error cambiando permisos (no critico):", err.message);
+        }
+      }
     } else {
-      fs.chmodSync(this.ytDlpPath, "755");
-      console.log("yt-dlp encontrado en:", this.ytDlpPath);
+      console.error("ERROR: yt-dlp NO ENCONTRADO. Las descargas no funcionaran.");
     }
 
     console.log("Directorio de descargas:", this.downloadsPath);
