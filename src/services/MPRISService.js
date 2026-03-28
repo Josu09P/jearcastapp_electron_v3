@@ -1,3 +1,4 @@
+// src/services/MPRISService.js
 const { EventEmitter } = require('events');
 const { app } = require('electron');
 
@@ -9,11 +10,12 @@ class MPRISService extends EventEmitter {
     this.metadata = {};
     this.currentPosition = 0;
     this.duration = 0;
-    this.sessionBus = null; // Guardamos referencia al bus
+    this.sessionBus = null;
+    this.isOnlinePlayback = false; // Nuevo: para saber si es online o local
     
     setTimeout(() => {
       this.setupMPRIS();
-    }, 1000); // Un poco más de delay ayuda a que el bus esté listo en Flatpak
+    }, 1000);
   }
 
   setupMPRIS() {
@@ -24,7 +26,6 @@ class MPRISService extends EventEmitter {
       const serviceName = 'org.mpris.MediaPlayer2.jearcast';
       const objectPath = '/org/mpris/MediaPlayer2';
       
-      // Crear el objeto de servicio
       const serviceObject = {
         'org.mpris.MediaPlayer2': {
           Raise: () => {
@@ -50,6 +51,7 @@ class MPRISService extends EventEmitter {
           Next: () => {
             console.log('MPRIS: Next');
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+              // Enviar evento para next - funciona para online y local
               this.mainWindow.webContents.send('media-key-pressed', 'next');
             }
           },
@@ -88,12 +90,14 @@ class MPRISService extends EventEmitter {
           },
           Seek: (offset) => {
             const newPosition = Math.max(0, Math.min(this.duration, this.currentPosition + offset / 1000000));
+            console.log('MPRIS: Seek to', newPosition);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.webContents.send('seek-to', newPosition);
             }
           },
           SetPosition: (trackId, position) => {
             const newPosition = Math.min(this.duration, position / 1000000);
+            console.log('MPRIS: SetPosition to', newPosition);
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.webContents.send('seek-to', newPosition);
             }
@@ -127,6 +131,7 @@ class MPRISService extends EventEmitter {
         this.sessionBus.exportInterface(serviceObject['org.mpris.MediaPlayer2.Player'], objectPath, 'org.mpris.MediaPlayer2.Player');
         
         this.updatePlaybackState('Stopped');
+        console.log('MPRIS: Servicio registrado correctamente');
       });
       
     } catch (error) {
@@ -140,15 +145,6 @@ class MPRISService extends EventEmitter {
     if (this.playbackState !== newState) {
       this.playbackState = newState;
       console.log('MPRIS: PlaybackStatus ->', newState);
-
-      // Notificar a GNOME que el estado cambió (Play/Pause)
-      try {
-        this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 
-          'PlaybackStatus': newState 
-        }, []);
-      } catch (err) {
-        console.error('Error emitiendo PlaybackStatus:', err);
-      }
     }
   }
  
@@ -163,20 +159,16 @@ class MPRISService extends EventEmitter {
       'mpris:artUrl': thumbnail || ''
     };
     
-    console.log('MPRIS: Enviando metadatos a GNOME:', title);
-
-    // Notificar a GNOME que la información de la canción cambió
-    try {
-      this.emit('PropertiesChanged', 'org.mpris.MediaPlayer2.Player', { 
-        'Metadata': this.metadata 
-      }, []);
-    } catch (err) {
-      console.error('Error emitiendo Metadata:', err);
-    }
+    console.log('MPRIS: Metadata actualizada:', title);
   }
 
   updatePosition(position) {
     this.currentPosition = position || 0;
+  }
+  
+  // Método para indicar si es reproducción online
+  setPlaybackType(isOnline) {
+    this.isOnlinePlayback = isOnline;
   }
 }
 
