@@ -13,7 +13,7 @@ const { promisify } = require("util");
 const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 
-// ✅ CORREGIDO: Usar path.join con __dirname para rutas absolutas dentro del ASAR
+// CORREGIDO: Usar path.join con __dirname para rutas absolutas dentro del ASAR
 const servicesPath = path.join(__dirname, 'services');
 const { DownloadService } = require(path.join(servicesPath, 'downloadService'));
 const { AudioService } = require(path.join(servicesPath, 'AudioService'));
