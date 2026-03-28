@@ -23,7 +23,7 @@ class MPRISService extends EventEmitter {
       const dbus = require('dbus-native');
       this.sessionBus = dbus.sessionBus();
       
-      const serviceName = 'org.mpris.MediaPlayer2.jearcast';
+      const serviceName = 'org.mpris.MediaPlayer2.com.jearcast.JearCast';
       const objectPath = '/org/mpris/MediaPlayer2';
       
       const serviceObject = {

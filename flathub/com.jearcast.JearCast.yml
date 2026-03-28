@@ -25,7 +25,7 @@ finish-args:
   - --device=dri
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.freedesktop.DBus
-  - --own-name=org.mpris.MediaPlayer2.jearcast
+  - --own-name=org.mpris.MediaPlayer2.com.jearcast.JearCast
   - --socket=session-bus
   - --filesystem=xdg-music:ro
   - --filesystem=xdg-download

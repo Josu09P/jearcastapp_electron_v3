@@ -131,7 +131,7 @@ function setupMediaKeys() {
 // ==================== CREACION DE VENTANA ====================
 function createWindow() {
   const expressApp = express();
-
+  app.setAppUserModelId('com.jearcast.JearCast');
   const appRoot = app.getAppPath();
   const distPath = path.join(appRoot, "src", "jearcast-view", "dist");
   const preloadPath = path.join(appRoot, "src", "preload.js");
@@ -144,14 +144,15 @@ function createWindow() {
 
     mainWindow = new BrowserWindow({
       width: 1200,
-      height: 650,
+      height: 750,
       resizable: true,
       frame: false,
       title: "JearCast",
       titleBarStyle: "hiddenInset",
       autoHideMenuBar: true,
       transparent: true,
-      backgroundColor: "#00000000",
+      hasShadow: true,
+      backgroundColor: "#0000007e",
       roundedCorners: true,
       webPreferences: {
         contextIsolation: true,
