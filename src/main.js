@@ -14,10 +14,10 @@ const readdir = promisify(fs.readdir);
 const stat = promisify(fs.stat);
 
 // CORREGIDO: Usar path.join con __dirname para rutas absolutas dentro del ASAR
-const servicesPath = path.join(__dirname, 'services');
-const { DownloadService } = require(path.join(servicesPath, 'downloadService'));
-const { AudioService } = require(path.join(servicesPath, 'AudioService'));
-const { MPRISService } = require(path.join(servicesPath, 'MPRISService'));
+const servicesPath = path.join(__dirname, "services");
+const { DownloadService } = require(path.join(servicesPath, "downloadService"));
+const { AudioService } = require(path.join(servicesPath, "AudioService"));
+const { MPRISService } = require(path.join(servicesPath, "MPRISService"));
 
 let mainWindow;
 let downloadService;
@@ -131,7 +131,7 @@ function setupMediaKeys() {
 // ==================== CREACION DE VENTANA ====================
 function createWindow() {
   const expressApp = express();
-  app.setAppUserModelId('com.jearcast.JearCast');
+  app.setAppUserModelId("com.jearcast.JearCast");
   const appRoot = app.getAppPath();
   const distPath = path.join(appRoot, "src", "jearcast-view", "dist");
   const preloadPath = path.join(appRoot, "src", "preload.js");
@@ -140,7 +140,9 @@ function createWindow() {
   expressApp.use(express.json());
 
   const server = expressApp.listen(3353, "127.0.0.1", () => {
-    console.log("Servidor interno de JearCast corriendo en http://localhost:3353");
+    console.log(
+      "Servidor interno de JearCast corriendo en http://localhost:3353",
+    );
 
     mainWindow = new BrowserWindow({
       width: 1200,
@@ -163,6 +165,10 @@ function createWindow() {
         allowRunningInsecureContent: true,
       },
     });
+
+    if (process.platform === "linux") {
+      mainWindow.setWMClass("jearcast", "jearcast");
+    }
 
     mainWindow.loadURL("http://localhost:3353");
 
@@ -223,18 +229,21 @@ function createWindow() {
 
     downloadService = new DownloadService();
     audioService = new AudioService();
-    
+
     // ✅ Inicializar MPRISService DESPUÉS de crear mainWindow
     mprisService = new MPRISService(mainWindow);
-    
+
     // ✅ Configurar listener de cambios de estado
-    ipcMain.on('player-state-change', (event, { state, title, artist, thumbnail, duration, position }) => {
-      if (mprisService) {
-        mprisService.updateMetadata({ title, artist, thumbnail, duration });
-        mprisService.updatePlaybackState(state);
-        mprisService.updatePosition(position);
-      }
-    });
+    ipcMain.on(
+      "player-state-change",
+      (event, { state, title, artist, thumbnail, duration, position }) => {
+        if (mprisService) {
+          mprisService.updateMetadata({ title, artist, thumbnail, duration });
+          mprisService.updatePlaybackState(state);
+          mprisService.updatePosition(position);
+        }
+      },
+    );
 
     if (audioService) {
       audioService.on("ended", () => {
