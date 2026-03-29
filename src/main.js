@@ -18,7 +18,7 @@ const servicesPath = path.join(__dirname, "services");
 const { DownloadService } = require(path.join(servicesPath, "downloadService"));
 const { AudioService } = require(path.join(servicesPath, "AudioService"));
 const { MPRISService } = require(path.join(servicesPath, "MPRISService"));
-
+app.name = "JearCast";
 let mainWindow;
 let downloadService;
 let audioService = null;
