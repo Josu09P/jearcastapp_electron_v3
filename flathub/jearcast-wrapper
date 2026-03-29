@@ -8,4 +8,4 @@
 cd /app/lib/jearcast/resources/
 
 # Ejecutar la aplicación desde la raíz, pasando la ruta al main.js dentro del ASAR
-exec /app/lib/jearcast/jearcast --no-sandbox "$@"
+exec /app/lib/jearcast/jearcast --no-sandbox src/main.js "$@"
