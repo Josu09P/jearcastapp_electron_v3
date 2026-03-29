@@ -30,6 +30,8 @@ finish-args:
   - --filesystem=xdg-music:ro
   - --filesystem=xdg-download
   - --filesystem=~/.local/share/jearcast:create
+  - --talk-name=org.mpris.MediaPlayer2.*
+  - --own-name=org.mpris.MediaPlayer2.JearCast
   
 modules:
   - name: jearcast
