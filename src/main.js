@@ -167,7 +167,7 @@ function createWindow() {
     });
 
     if (process.platform === "linux") {
-      mainWindow.setWMClass("jearcast", "jearcast");
+      // Electron ya usa el AppUserModelId o el nombre en el package.json
     }
 
     mainWindow.loadURL("http://localhost:3353");
