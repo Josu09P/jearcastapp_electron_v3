@@ -14,8 +14,8 @@ class MPRISService extends EventEmitter {
     this.interfaceName = "org.mpris.MediaPlayer2.Player";
     this.objectPath = "/org/mpris/MediaPlayer2";
     this.isOnlinePlayback = false;
-    // Referencia al interface exportado, necesaria para emitir señales
-    this.playerInterface = null;
+    this._busName = "org.mpris.MediaPlayer2.com.jearcast.JearCast";
+    this._serial = 1;
 
     setTimeout(() => {
       this.setupMPRIS();
@@ -27,8 +27,8 @@ class MPRISService extends EventEmitter {
       const dbus = require("dbus-native");
       this.sessionBus = dbus.sessionBus();
 
-      const serviceName = "org.mpris.MediaPlayer2.com.jearcast.JearCast";
-      const objectPath = "/org/mpris/MediaPlayer2";
+      const serviceName = this._busName;
+      const objectPath = this.objectPath;
 
       const serviceObject = {
         "org.mpris.MediaPlayer2": {
@@ -47,7 +47,6 @@ class MPRISService extends EventEmitter {
           CanRaise: true,
           HasTrackList: false,
           Identity: "JearCast Player",
-          // CRÍTICO: debe coincidir exactamente con el nombre del .desktop sin extensión
           DesktopEntry: "com.jearcast.JearCast",
           SupportedUriSchemes: ["file", "http", "https"],
           SupportedMimeTypes: ["audio/mpeg", "audio/x-mp3", "audio/flac"],
@@ -90,16 +89,12 @@ class MPRISService extends EventEmitter {
             }
           },
           GetPosition: () => {
-            // Retorna microsegundos como Int64
             return Math.floor(this.currentPosition * 1000000);
           },
           Seek: (offset) => {
             const newPosition = Math.max(
               0,
-              Math.min(
-                this.duration,
-                this.currentPosition + offset / 1000000,
-              ),
+              Math.min(this.duration, this.currentPosition + offset / 1000000),
             );
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
               this.mainWindow.webContents.send("seek-to", newPosition);
@@ -148,8 +143,7 @@ class MPRISService extends EventEmitter {
           "org.mpris.MediaPlayer2.Player",
         );
 
-        // ✅ Guardar referencia al interface del player para emitir señales
-        this.playerInterface = serviceObject["org.mpris.MediaPlayer2.Player"];
+        console.log("MPRIS: Servicio registrado correctamente bajo " + serviceName);
 
         // Emitir estado inicial para que GNOME Shell registre el player
         this._emitPropertiesChanged({
@@ -160,32 +154,53 @@ class MPRISService extends EventEmitter {
           CanGoPrevious:  ["b", true],
           CanSeek:        ["b", true],
         });
-
-        console.log("MPRIS: Servicio registrado correctamente bajo " + serviceName);
       });
     } catch (error) {
       console.error("Error configurando MPRIS:", error);
     }
   }
 
-  // ✅ CORRECCIÓN PRINCIPAL: emite PropertiesChanged al bus D-Bus
-  // Sin esto, GNOME Shell nunca sabe que cambió el estado → icono roto
+  // ✅ CORRECCIÓN: dbus-native NO tiene sessionBus.emit()
+  // La señal se construye como mensaje raw y se envía por la conexión interna.
+  // dbus-native expone la conexión TCP/Unix como sessionBus.connection
   _emitPropertiesChanged(changedProps) {
-    if (!this.sessionBus || !this.playerInterface) return;
+    if (!this.sessionBus) return;
+
     try {
-      this.sessionBus.emit(
-        this.objectPath,                          // ruta del objeto
-        "org.freedesktop.DBus.Properties",        // interfaz de la señal
-        "PropertiesChanged",                      // nombre de la señal
-        "sa{sv}as",                               // firma D-Bus
-        [this.interfaceName, changedProps, []],   // [interfaz, props, invalidadas]
-      );
+      // dbus-native almacena la conexión real en .connection
+      const conn = this.sessionBus.connection;
+
+      if (!conn || typeof conn.message !== "function") {
+        console.warn("MPRIS: Conexión D-Bus no disponible aún");
+        return;
+      }
+
+      // Mensaje de señal D-Bus tipo 4 (SIGNAL)
+      // Firma: sa{sv}as
+      //   s      → nombre de la interfaz que cambió
+      //   a{sv}  → dict con las propiedades nuevas
+      //   as     → array de propiedades invalidadas (vacío)
+      conn.message({
+        type: 4,
+        serial: this._serial++,
+        path: this.objectPath,
+        interface: "org.freedesktop.DBus.Properties",
+        member: "PropertiesChanged",
+        signature: "sa{sv}as",
+        body: [
+          this.interfaceName,
+          changedProps,
+          [],
+        ],
+      });
+
+      console.log("MPRIS: PropertiesChanged →", Object.keys(changedProps).join(", "));
     } catch (e) {
-      console.error("MPRIS: Error emitiendo PropertiesChanged:", e);
+      console.error("MPRIS: Error emitiendo PropertiesChanged:", e.message);
     }
   }
 
-  // ✅ CORREGIDO: ahora notifica al bus después de cada cambio de estado
+  // ✅ Notifica a D-Bus tras cada cambio de estado
   updatePlaybackState(state) {
     const map = { playing: "Playing", paused: "Paused", stopped: "Stopped" };
     const newState = map[state] ?? "Stopped";
@@ -197,31 +212,24 @@ class MPRISService extends EventEmitter {
     });
   }
 
-  // ✅ CORREGIDO: tipos D-Bus explícitos para cada campo
-  // dbus-native necesita tuplas ['tipo', valor] para tipos no-string
+  // ✅ Tipos D-Bus explícitos + notificación al bus
   updateMetadata({ title, artist, thumbnail, duration }) {
     this.duration = duration || 0;
 
-    // Fallback al icono instalado si no hay miniatura
     const artUrl =
       thumbnail && thumbnail.trim() !== ""
         ? thumbnail
         : "file:///app/share/icons/hicolor/256x256/apps/com.jearcast.JearCast.png";
 
     this.metadata = {
-      // 'o' = ObjectPath  (REQUERIDO por la especificación MPRIS)
       "mpris:trackid": ["o", `/com/jearcast/track/${Date.now()}`],
-      // 'x' = Int64 en microsegundos  (número JS puede truncarse sin esto)
       "mpris:length":  ["x", Math.floor((duration || 0) * 1000000)],
-      // 's' = string
       "mpris:artUrl":  ["s", artUrl],
       "xesam:title":   ["s", title  || "Desconocido"],
       "xesam:album":   ["s", "JearCast Player"],
-      // 'as' = array de strings
       "xesam:artist":  ["as", [artist || "Artista desconocido"]],
     };
 
-    // ✅ Notifica al bus — GNOME Shell actualiza título, artista y miniatura
     this._emitPropertiesChanged({
       Metadata: ["a{sv}", this.metadata],
     });
