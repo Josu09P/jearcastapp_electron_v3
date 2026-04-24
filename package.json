@@ -2,7 +2,7 @@
   "name": "JearCast",
   "version": "1.0.0",
   "description": "JearCast Player - Desktop App",
-  "main": "src/main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "dev": "electron .",
     "build": "electron-builder"
@@ -12,25 +12,43 @@
     "productName": "JearCast Player",
     "asar": true,
     "asarUnpack": [
-      "**/node_modules/@ffmpeg-installer/ffmpeg/**/*"
+      "**/node_modules/@ffmpeg-installer/ffmpeg/**/*",
+      "src/resources/bin/**/*"
     ],
     "directories": {
       "output": "dist_electron",
       "buildResources": "build"
     },
     "files": [
-      "src/main.js",
+      "src/main/**/*",
       "src/preload.js",
       "src/jearcast-view/dist/**/*",
-      "src/services/**/*",
-      "bin/yt-dlp"
+      "build/**/*",
+      {
+        "from": "src/resources/bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "linux": {
       "target": [
-        "dir"
+        "AppImage",
+        "deb",
+        "rpm"
       ],
       "category": "AudioVideo",
-      "icon": "build/icons"
+      "icon": "build/icons-dash",
+      "executableName": "jearcast",
+      "desktop": {
+        "entry": {
+          "Name": "JearCast Player",
+          "Comment": "JearCast Player - Desktop App",
+          "Categories": "AudioVideo;Player;",
+          "StartupWMClass": "jearcast"
+        }
+      }
     }
   },
   "repository": {
@@ -44,7 +62,8 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^37.2.0",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.0.12",
+    "sharp": "^0.34.5"
   },
   "dependencies": {
     "@distube/ytdl-core": "^4.16.12",
