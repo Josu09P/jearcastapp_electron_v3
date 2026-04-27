@@ -4,7 +4,6 @@ const { app } = require("electron");
 const { spawn } = require("child_process");
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
-const { isContentSacred } = require("./sacredPolicy");
 
 class DownloadService {
   constructor() {
@@ -267,14 +266,6 @@ class DownloadService {
         
         try {
           const info = JSON.parse(stdout);
-
-          // 🕊️ VALIDACIÓN SAGRADA
-          const sacredResult = isContentSacred(info);
-          if (!sacredResult.sacred) {
-            console.log(`🚫 [DESCARGA BLOQUEADA] Contenido no permitido: ${info.title} (${sacredResult.reason})`);
-            reject(new Error("Contenido bloqueado por políticas de música sacra adventista"));
-            return;
-          }
           
           const videoInfo = {
             videoId: info.id || videoId,
@@ -286,7 +277,7 @@ class DownloadService {
             filesize: info.filesize || 0
           };
           
-          console.log('✅ Información obtenida y validada:', videoInfo.title);
+          console.log('✅ Información obtenida:', videoInfo.title);
           resolve(videoInfo);
         } catch (e) {
           console.error("❌ Error parseando información:", e);

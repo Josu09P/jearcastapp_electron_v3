@@ -2,17 +2,12 @@ const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { app } = require("electron");
-const { SACRED_BLACKLIST, NEGATIVE_KEYWORDS, isContentSacred } = require("./sacredPolicy");
 
 class YouTubeSearchService {
   constructor() {
     // Detectar la ruta de yt-dlp
     this.ytdlpPath = this.findYtDlp();
 
-    // 🕊️ POLÍTICAS DE FILTRADO (Importadas)
-    this.SACRED_BLACKLIST = SACRED_BLACKLIST;
-    this.NEGATIVE_KEYWORDS = NEGATIVE_KEYWORDS;
-    
     // 🔥 CACHÉ PARA EVITAR LLAMADAS REPETIDAS
     this.cache = {
       channels: new Map(),    // Cache de canales (30 min)
@@ -30,29 +25,23 @@ class YouTubeSearchService {
     
     console.log("🔍 YouTubeSearchService inicializado con caché y control de concurrencia");
     console.log("   yt-dlp:", this.ytdlpPath);
-    console.log("   🕊️ Política Sagrada Activa: Filtrando contenido adventista");
+    console.log("   🔓 Versión General: Búsqueda universal sin filtros de género");
   }
 
   /**
-   * NIVEL 1: Inyección de Query Negativa (Reducida para mayor precisión)
+   * Limpieza de Query (Sin inyección de palabras negativas)
    */
   applySacredPolicyToQuery(query) {
     if (!query) return "";
-    // Limpiamos la query de posibles inyecciones previas del frontend para no duplicar
-    const cleanQuery = query.split(" -")[0].trim();
-    return `${cleanQuery} ${this.NEGATIVE_KEYWORDS}`;
+    // Retornamos la query original limpia, sin añadir nada
+    return query.split(" -")[0].trim();
   }
 
   /**
-   * NIVEL 2: Escaneo de Metadatos (Post-procesamiento)
-   * Valida si un video cumple con los estándares de la aplicación (evitar géneros mundanos).
+   * Validación de contenido (Neutralidad total)
    */
   isContentSacred(video) {
-    const result = isContentSacred(video);
-    if (!result.sacred) {
-      console.log(`🚫 [FILTRO GÉNERO] Omitido: ${video.title || video.name || "Sin título"} (${result.reason})`);
-    }
-    return result.sacred;
+    return true;
   }
 
   /**
@@ -162,12 +151,11 @@ class YouTubeSearchService {
                 try { return JSON.parse(line); } catch { return null; }
               })
               .filter(Boolean)
-              .filter((video) => this.isContentSacred(video)) // Nivel 2: Filtrado de metadatos
               .map((video) => this.formatVideoResult(video));
 
             // Guardar en caché
             this.cache.searches.set(cacheKey, { data: results, timestamp: Date.now() });
-            console.log(`✅ Filtrados y aceptados: ${results.length} videos`);
+            console.log(`✅ Resultados encontrados: ${results.length} videos`);
             resolve(results);
           } catch {
             resolve([]);
@@ -196,7 +184,6 @@ class YouTubeSearchService {
               try { return JSON.parse(line); } catch { return null; }
             })
             .filter(Boolean)
-            .filter((video) => this.isContentSacred(video)) // Nivel 2: Filtrado de metadatos
             .map((video) => this.formatVideoResult(video));
           resolve(results);
         } catch {
@@ -235,14 +222,6 @@ class YouTubeSearchService {
           if (error) { reject(error); return; }
           try {
             const info = JSON.parse(stdout.trim());
-            
-            // Validar que el video siga cumpliendo las políticas (por si se accede directo por ID)
-            if (!this.isContentSacred(info)) {
-              console.log(`🚫 [BLOQUEO] Video ${videoId} no cumple las políticas sagradas.`);
-              reject(new Error("Contenido no permitido por políticas de la aplicación"));
-              return;
-            }
-
             const result = this.formatVideoResult(info);
             this.cache.videos.set(cacheKey, { data: result, timestamp: Date.now() });
             resolve(result);
@@ -292,7 +271,6 @@ class YouTubeSearchService {
                 try { return JSON.parse(line); } catch { return null; }
               })
               .filter(Boolean)
-              .filter((video) => this.isContentSacred(video)) // Nivel 2: Filtrado de metadatos
               .map((video) => this.formatVideoResult(video))
               .slice(0, limit);
             
@@ -378,7 +356,6 @@ class YouTubeSearchService {
                 try { return JSON.parse(line); } catch { return null; }
               })
               .filter(Boolean)
-              .filter((item) => this.isContentSacred(item)) // Nivel 2: Filtrado por géneros
               .filter((item) => item.channel_id || item.uploader_id)
               .map((item) => ({
                 channelId: item.channel_id || item.uploader_id || "",

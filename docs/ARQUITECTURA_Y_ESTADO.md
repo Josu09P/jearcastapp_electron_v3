@@ -1,22 +1,21 @@
 # JearCast - Documentación Técnica y Estado del Proyecto
 
 ## Misión del Proyecto
-JearCast es una aplicación de streaming y reproductor local diseñada exclusivamente para la comunidad Cristiana Adventista. Su objetivo es proporcionar un entorno de adoración puro, filtrando géneros mundanos (Pop, Rock, Reguetón, etc.) y priorizando música sacra, himnos y ministerios adventistas.
+JearCast es una aplicación de streaming y reproductor local diseñada para proporcionar una experiencia de música universal y sin censura. En esta Versión General, se han eliminado todas las políticas de restricción de género para permitir el acceso a cualquier tipo de contenido musical.
 
 ## Arquitectura Técnica
 *   **Frontend**: Vue 3 (Gestiona la UI y el reproductor de YouTube).
-*   **Backend**: Electron (Gestiona el sistema de archivos, motor de audio local y filtrado).
+*   **Backend**: Electron (Gestiona el sistema de archivos, motor de audio local y provisión neutral de datos).
 *   **Scraping/Búsqueda**: `yt-dlp` para YouTube.
 *   **Procesamiento de Audio**: `ffmpeg` / `ffprobe`.
 *   **Motor de Audio Local**: Ventana oculta de Electron (Web Audio API) para máxima compatibilidad sin dependencias externas.
 
 ## Funcionalidades Implementadas
 
-### 1. Políticas de Filtrado Sagrado (Backend)
-*   **Nivel 1 (Preventivo)**: Inyección de palabras clave negativas en las búsquedas de YouTube para omitir contenido secular.
-*   **Nivel 2 (Correctivo)**: Escaneo de metadatos (título, descripción, etiquetas) contra una Blacklist de géneros prohibidos.
-*   **Modo Permisivo**: Solo bloquea lo que está en la Blacklist; permite canciones suaves de artistas cristianos aunque el título sea genérico (ej: "Solo Amor" de Karen Cruzado).
-*   **Búsqueda de Canales**: Optimizada para encontrar canales oficiales de artistas sin bloqueos por palabras negativas.
+### 1. Motor de Búsqueda Neutral (Backend)
+*   **Búsqueda Universal**: No se aplican filtros de palabras clave ni términos de exclusión negativos en las consultas de YouTube.
+*   **Post-procesamiento Libre**: Se ha eliminado el escaneo de metadatos contra blacklists, permitiendo que todos los resultados encontrados sean devueltos al usuario.
+*   **Acceso Total**: Soporte para visualizar cualquier canal de YouTube y video sin restricciones por género musical.
 
 ### 2. Módulo de Música Local
 *   **Protocolo Seguro**: Uso de `local-media://` para acceder a archivos locales sin violar CORS.
