@@ -28,9 +28,24 @@ class YouTubeSearchService {
     this.activeRequests = 0;
     this.queue = [];
     
+    // 🔥 AUTO-LIMPIEZA DE MEMORIA (Cada 15 minutos)
+    this.cleanupInterval = setInterval(() => this.cleanCache(), 15 * 60 * 1000);
+
     console.log("🔍 YouTubeSearchService inicializado con caché y control de concurrencia");
     console.log("   yt-dlp:", this.ytdlpPath);
     console.log("   🕊️ Política Sagrada Activa: Filtrando contenido adventista");
+  }
+
+  /**
+   * Destructor para evitar fugas al recargar/cerrar
+   */
+  destroy() {
+    if (this.cleanupInterval) clearInterval(this.cleanupInterval);
+    this.cache.channels.clear();
+    this.cache.searches.clear();
+    this.cache.videos.clear();
+    this.cache.related.clear();
+    this.cache.thumbnails.clear();
   }
 
   /**
@@ -59,24 +74,27 @@ class YouTubeSearchService {
    * Encontrar yt-dlp en el sistema
    */
   findYtDlp() {
+    const isWin = process.platform === "win32";
+    const binName = isWin ? "yt-dlp.exe" : "yt-dlp";
+
     if (app.isPackaged) {
       const possiblePaths = [
-        path.join(process.resourcesPath, "bin", "yt-dlp"),
-        path.join(process.resourcesPath, "app.asar.unpacked", "bin", "yt-dlp"),
-        path.join(app.getAppPath(), "..", "bin", "yt-dlp"),
-        path.join(app.getAppPath() + ".unpacked", "bin", "yt-dlp"),
-        path.join(path.dirname(app.getPath("exe")), "resources", "bin", "yt-dlp"),
+        path.join(process.resourcesPath, "bin", binName),
+        path.join(process.resourcesPath, "app.asar.unpacked", "bin", binName),
+        path.join(app.getAppPath(), "..", "bin", binName),
+        path.join(app.getAppPath() + ".unpacked", "bin", binName),
+        path.join(path.dirname(app.getPath("exe")), "resources", "bin", binName),
       ];
       const found = possiblePaths.find((p) => fs.existsSync(p));
-      return found || "yt-dlp";
+      return found || binName;
     } else {
       const devPaths = [
-        path.join(__dirname, "..", "..", "resources", "bin", "yt-dlp"),
-        path.join(app.getAppPath(), "src", "resources", "bin", "yt-dlp"),
-        path.join(process.cwd(), "src", "resources", "bin", "yt-dlp"),
+        path.join(__dirname, "..", "..", "resources", "bin", binName),
+        path.join(app.getAppPath(), "src", "resources", "bin", binName),
+        path.join(process.cwd(), "src", "resources", "bin", binName),
       ];
       const found = devPaths.find((p) => fs.existsSync(p));
-      return found || "yt-dlp";
+      return found || binName;
     }
   }
 
@@ -84,7 +102,6 @@ class YouTubeSearchService {
   async enqueue(fn, key) {
     // Si ya hay una solicitud pendiente con la misma key, esperar
     if (this.pendingRequests.has(key)) {
-      console.log('⏳ [COLA] Esperando resultado existente:', key);
       return this.pendingRequests.get(key);
     }
 
@@ -111,18 +128,49 @@ class YouTubeSearchService {
     this.activeRequests++;
     const { fn, key, resolve, reject } = this.queue.shift();
 
-    console.log(`🔄 [COLA] Procesando (${this.activeRequests}/${this.maxConcurrent}):`, key);
-
     try {
       const result = await fn();
       resolve(result);
     } catch (error) {
-      console.error('❌ [COLA] Error:', key, error.message);
       reject(error);
     } finally {
       this.activeRequests--;
-      this.processQueue(); // Procesar siguiente en cola
+      this.processQueue();
     }
+  }
+
+  /**
+   * Ejecución segura con spawn (mejor que exec para memoria)
+   */
+  async safeRun(args, timeout = 15000) {
+    return new Promise((resolve, reject) => {
+      const child = require('child_process').spawn(this.ytdlpPath, args);
+      let stdout = "";
+      let stderr = "";
+      
+      const timer = setTimeout(() => {
+        child.kill();
+        reject(new Error("Timeout alcanzado"));
+      }, timeout);
+
+      child.stdout.on("data", (data) => { stdout += data; });
+      child.stderr.on("data", (data) => { stderr += data; });
+
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        if (code === 0) resolve(stdout);
+        else reject(new Error(stderr || `Error ${code}`));
+        
+        // Limpieza explícita
+        stdout = null;
+        stderr = null;
+      });
+
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
   }
 
   /**
@@ -132,48 +180,41 @@ class YouTubeSearchService {
     const filteredQuery = this.applySacredPolicyToQuery(query);
     const cacheKey = `search:${filteredQuery}:${limit}`;
     
-    // Verificar caché
     const cached = this.cache.searches.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < 300000) { // 5 min
-      console.log('📦 [CACHÉ] Búsqueda:', query);
+    if (cached && (Date.now() - cached.timestamp) < 300000) { 
       return cached.data;
     }
 
     return this.enqueue(async () => {
-      console.log('🔍 [FETCH] Buscando:', query, `(límite: ${limit})`);
-      console.log('🛡️ [SAGRADO] Query procesada:', filteredQuery);
-      
-      return new Promise((resolve) => {
-        const command = `"${this.ytdlpPath}" "ytsearch${limit}:${this.escapeQuery(filteredQuery)}" --dump-json --no-playlist --flat-playlist --skip-download --no-warnings --no-check-certificate`;
+      try {
+        const args = [
+          `ytsearch${limit}:${filteredQuery}`,
+          "--dump-json",
+          "--no-playlist",
+          "--flat-playlist",
+          "--skip-download",
+          "--no-warnings",
+          "--no-check-certificate"
+        ];
 
-        exec(command, { timeout: 15000, maxBuffer: 1024 * 1024 * 10 }, (error, stdout) => {
-          if (error) {
-            console.error("❌ Error en búsqueda, intentando fallback...");
-            this.fallbackSearch(query, limit).then(resolve).catch(() => resolve([]));
-            return;
-          }
+        const stdout = await this.safeRun(args);
+        const results = stdout
+          .trim()
+          .split("\n")
+          .filter(line => line.trim().startsWith("{"))
+          .map(line => {
+            try { return JSON.parse(line); } catch { return null; }
+          })
+          .filter(Boolean)
+          .filter(v => this.isContentSacred(v))
+          .map(v => this.formatVideoResult(v));
 
-          try {
-            const results = stdout
-              .trim()
-              .split("\n")
-              .filter((line) => line.trim().startsWith("{"))
-              .map((line) => {
-                try { return JSON.parse(line); } catch { return null; }
-              })
-              .filter(Boolean)
-              .filter((video) => this.isContentSacred(video)) // Nivel 2: Filtrado de metadatos
-              .map((video) => this.formatVideoResult(video));
-
-            // Guardar en caché
-            this.cache.searches.set(cacheKey, { data: results, timestamp: Date.now() });
-            console.log(`✅ Filtrados y aceptados: ${results.length} videos`);
-            resolve(results);
-          } catch {
-            resolve([]);
-          }
-        });
-      });
+        this.cache.searches.set(cacheKey, { data: results, timestamp: Date.now() });
+        return results;
+      } catch (error) {
+        console.error("Error en búsqueda:", error.message);
+        return [];
+      }
     }, cacheKey);
   }
 

@@ -49,6 +49,13 @@
           "StartupWMClass": "jearcast"
         }
       }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
     }
   },
   "repository": {

@@ -39,6 +39,8 @@ let localMusicService = null;
 if (process.platform === "linux") {
   app.setName("jearcast");
   app.setAppUserModelId("jearcast");
+} else if (process.platform === "win32") {
+  app.setAppUserModelId("com.jearcast.JearCast");
 }
 
 let mainWindow = null;
@@ -511,7 +513,9 @@ if (!gotTheLock) {
 
   app.whenReady().then(() => {
     // Inicializar servicios globales
-    if (!mprisService) mprisService = new MPRISService(null);
+    if (!mprisService && process.platform === "linux") {
+      mprisService = new MPRISService(null);
+    }
     if (!downloadService) downloadService = new DownloadService();
     if (!youtubeSearchService) youtubeSearchService = new YouTubeSearchService();
     if (!localMusicService) localMusicService = new LocalMusicService();
@@ -556,6 +560,7 @@ if (!gotTheLock) {
   app.on("will-quit", () => {
     globalShortcut.unregisterAll();
     if (audioService) audioService.stopPlayback();
+    if (youtubeSearchService) youtubeSearchService.destroy();
     if (server) server.close();
   });
 }

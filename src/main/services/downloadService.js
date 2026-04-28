@@ -8,8 +8,7 @@ const { isContentSacred } = require("./sacredPolicy");
 
 class DownloadService {
   constructor() {
-    const homeDir = process.env.HOME || process.env.USERPROFILE;
-    this.downloadsPath = path.join(homeDir, "Descargas", "JearCast");
+    this.downloadsPath = path.join(app.getPath("downloads"), "JearCast");
     
     if (!fs.existsSync(this.downloadsPath)) {
       fs.mkdirSync(this.downloadsPath, { recursive: true });
@@ -62,54 +61,46 @@ class DownloadService {
 
   setupYtDlp() {
     try {
+      const isWin = process.platform === "win32";
+      const binName = isWin ? "yt-dlp.exe" : "yt-dlp";
+
       if (app.isPackaged) {
-        // En producción, buscar en múltiples ubicaciones posibles
         const possiblePaths = [
-          path.join(process.resourcesPath, "bin", "yt-dlp"),
-          path.join(process.resourcesPath, "app.asar.unpacked", "bin", "yt-dlp"),
-          path.join(app.getAppPath(), "..", "bin", "yt-dlp"),
-          path.join(app.getAppPath() + ".unpacked", "bin", "yt-dlp"),
-          path.join(path.dirname(app.getPath('exe')), "resources", "bin", "yt-dlp"),
-          path.join(path.dirname(app.getPath('exe')), "resources", "app.asar.unpacked", "bin", "yt-dlp")
+          path.join(process.resourcesPath, "bin", binName),
+          path.join(process.resourcesPath, "app.asar.unpacked", "bin", binName),
+          path.join(app.getAppPath(), "..", "bin", binName),
+          path.join(path.dirname(app.getPath('exe')), "resources", "bin", binName)
         ];
         
-        this.ytdlpPath = possiblePaths.find(p => {
-          const exists = fs.existsSync(p);
-          console.log(`   Buscando yt-dlp en: ${p} -> ${exists ? '✅' : '❌'}`);
-          return exists;
-        });
+        this.ytdlpPath = possiblePaths.find(p => fs.existsSync(p));
         
         if (!this.ytdlpPath) {
-          console.error('❌ DownloadService: No se encontró yt-dlp en ninguna ubicación');
-          console.error('   Ubicaciones buscadas:', possiblePaths);
-          throw new Error('yt-dlp binary not found in any expected location');
+          console.error(`❌ DownloadService: No se encontró ${binName} en producción`);
+          // Fallback al nombre del binario por si está en el PATH
+          this.ytdlpPath = binName;
         }
       } else {
-        // En desarrollo
         const devPaths = [
-          path.join(__dirname, "..", "resources", "bin", "yt-dlp"),
-          path.join(app.getAppPath(), "src", "resources", "bin", "yt-dlp"),
-          path.join(process.cwd(), "src", "resources", "bin", "yt-dlp")
+          path.join(__dirname, "..", "..", "resources", "bin", binName),
+          path.join(app.getAppPath(), "src", "resources", "bin", binName),
+          path.join(process.cwd(), "src", "resources", "bin", binName)
         ];
         
         this.ytdlpPath = devPaths.find(p => fs.existsSync(p));
         
         if (!this.ytdlpPath) {
-          console.error('❌ DownloadService: No se encontró yt-dlp en desarrollo');
-          throw new Error('yt-dlp binary not found in development');
+          console.warn(`⚠️ DownloadService: No se encontró ${binName} local. Usando sistema.`);
+          this.ytdlpPath = this.findSystemBinary('yt-dlp') || binName;
         }
       }
       
       console.log("✅ DownloadService: Usando yt-dlp en", this.ytdlpPath);
       
-      // Verificar y establecer permisos de ejecución (solo en Linux)
-      if (process.platform === "linux") {
+      if (process.platform === "linux" && fs.existsSync(this.ytdlpPath)) {
         this.ensureExecutablePermissions(this.ytdlpPath);
       }
-      
     } catch (error) {
       console.error("❌ Error configurando yt-dlp:", error);
-      throw error;
     }
   }
 
@@ -160,8 +151,10 @@ class DownloadService {
 
   findSystemBinary(binaryName) {
     try {
-      const result = require('child_process').execSync(`which ${binaryName}`, { encoding: 'utf8' });
-      const binaryPath = result.trim();
+      const isWin = process.platform === 'win32';
+      const cmd = isWin ? `where ${binaryName}` : `which ${binaryName}`;
+      const result = require('child_process').execSync(cmd, { encoding: 'utf8' });
+      const binaryPath = result.trim().split('\n')[0];
       return binaryPath && fs.existsSync(binaryPath) ? binaryPath : null;
     } catch (error) {
       return null;
