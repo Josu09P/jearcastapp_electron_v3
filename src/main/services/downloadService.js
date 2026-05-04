@@ -47,7 +47,7 @@ class DownloadService {
       }
       
       if (fs.existsSync(ffmpegPath)) {
-        ffmpeg.setFfmpegPath(ffmpegPath);
+        ffmpeg.setFfmpegPath(ffmpegPath); this.ffmpegPath = ffmpegPath;
         console.log("✅ DownloadService: Usando FFmpeg en", ffmpegPath);
       } else {
         console.error("❌ DownloadService: FFmpeg no encontrado en", ffmpegPath);
@@ -172,7 +172,7 @@ class DownloadService {
     
     // Verificar FFmpeg
     try {
-      const ffmpegTest = spawn(ffmpegInstaller.path, ['-version']);
+      const ffmpegTest = spawn(this.ffmpegPath, ['-version']);
       ffmpegTest.on('error', (err) => {
         console.error('❌ FFmpeg no funciona:', err.message);
       });
@@ -301,106 +301,55 @@ class DownloadService {
         const sanitizedTitle = this.sanitizeFilename(videoInfo.title || title || videoId);
         const finalPath = path.join(this.downloadsPath, `${sanitizedTitle}.mp3`);
 
-        // Verificar que el directorio de descargas existe
-        if (!fs.existsSync(this.downloadsPath)) {
-          fs.mkdirSync(this.downloadsPath, { recursive: true });
-        }
-
-        this.emitProgress(downloadId, 5, "starting");
-
-        // yt-dlp para obtener el stream de audio
+        // yt-dlp optimizado para descargar con Metadata y Portada incrustada
         const ytdlpArgs = [
-          "-f", "bestaudio/best",  // Mejor formato de audio
-          "--no-playlist",         // No procesar playlists
-          "--no-warnings",         // Reducir output
-          "-o", "-",              // Enviar a stdout
+          "--extract-audio",
+          "--audio-format", "mp3",
+          "--audio-quality", quality + "k",
+          "--embed-thumbnail", "--convert-thumbnails", "jpg",    // Incrustar portada
+          "--add-metadata", "--ffmpeg-location", this.ffmpegPath,       // Incrustar etiquetas ID3
+          "--no-playlist",
+          "--no-warnings",
+          "-o", finalPath,
           url
         ];
 
-        console.log('🔄 Ejecutando yt-dlp con args:', ytdlpArgs.join(' '));
+        console.log("📥 Descargando con metadata:", ytdlpArgs.join(" "));
         
-        const ytdlpProcess = spawn(this.ytdlpPath, ytdlpArgs, {
-          stdio: ['ignore', 'pipe', 'pipe']
+        const ytdlpProcess = spawn(this.ytdlpPath, ytdlpArgs);
+
+        ytdlpProcess.stdout.on("data", (data) => {
+          const text = data.toString();
+          // Capturar el progreso directamente de yt-dlp
+          const match = text.match(/\[download\]\s+(\d+\.\d+)%/);
+          if (match) {
+            this.emitProgress(downloadId, Math.round(parseFloat(match[1])), "downloading");
+          }
         });
 
-        let ytdlpError = '';
-        ytdlpProcess.stderr.on('data', (data) => {
-          ytdlpError += data.toString();
-        });
-
-        ytdlpProcess.on('error', (error) => {
-          console.error('❌ Error en proceso yt-dlp:', error);
+        ytdlpProcess.on("error", (error) => {
+          console.error("❌ Error en yt-dlp:", error);
           this.emitProgress(downloadId, 0, "error");
-          reject(new Error(`Error en yt-dlp: ${error.message}`));
+          reject(error);
         });
 
-        // Procesar con FFmpeg
-        const command = ffmpeg(ytdlpProcess.stdout)
-          .audioBitrate(quality)
-          .audioFrequency(44100)
-          .audioChannels(2)
-          .toFormat("mp3")
-          .on("start", (commandLine) => {
-            console.log('🎵 FFmpeg iniciado:', commandLine.substring(0, 200));
-            this.emitProgress(downloadId, 10, "downloading");
-          })
-          .on("progress", (progress) => {
-            if (progress.percent) {
-              this.emitProgress(downloadId, Math.min(Math.round(progress.percent), 99), "downloading");
-            }
-          })
-          .on("error", (err, stdout, stderr) => {
-            console.error('❌ Error en FFmpeg:', err.message);
-            
-            // Verificar si fue cancelado
-            if (err.message.includes("SIGKILL") || err.message.includes("SIGTERM")) {
-              this.emitProgress(downloadId, 0, "cancelled");
-              return resolve({ success: false, cancelled: true });
-            }
-            
+        ytdlpProcess.on("close", (code) => {
+          if (code === 0 && fs.existsSync(finalPath)) {
+            console.log("✅ Descarga completada con metadata:", finalPath);
+            this.emitProgress(downloadId, 100, "completed");
+            this.activeDownloads.delete(downloadId);
+            resolve({ success: true, path: finalPath, title: videoInfo.title });
+          } else {
             this.emitProgress(downloadId, 0, "error");
-            
-            // Limpiar archivo parcial si existe
-            if (fs.existsSync(finalPath)) {
-              try {
-                fs.unlinkSync(finalPath);
-              } catch (cleanupError) {
-                console.error('Error limpiando archivo parcial:', cleanupError);
-              }
-            }
-            
-            reject(new Error(`Error en conversión: ${err.message}`));
-          })
-          .on("end", () => {
-            // Verificar que el archivo se creó correctamente
-            if (fs.existsSync(finalPath) && fs.statSync(finalPath).size > 0) {
-              console.log('✅ Descarga completada:', finalPath);
-              this.emitProgress(downloadId, 100, "completed");
-              this.activeDownloads.delete(downloadId);
-              resolve({ 
-                success: true, 
-                path: finalPath,
-                title: videoInfo.title,
-                size: fs.statSync(finalPath).size
-              });
-            } else {
-              console.error('❌ El archivo final no existe o está vacío');
-              this.emitProgress(downloadId, 0, "error");
-              reject(new Error("El archivo descargado está vacío o no existe"));
-            }
-          });
-
-        // Guardar referencia para poder cancelar
-        this.activeDownloads.set(downloadId, { 
-          command, 
-          ytdlpProcess, 
-          cancelled: false,
-          startTime: Date.now(),
-          finalPath
+            reject(new Error(`Error en descarga (código ${code})`));
+          }
         });
-        
-        // Iniciar la conversión y guardado
-        command.save(finalPath);
+
+        this.activeDownloads.set(downloadId, { 
+          ytdlpProcess, 
+          finalPath,
+          startTime: Date.now(), cancelled: false
+        });
 
       } catch (error) {
         console.error('❌ Error en descarga:', error);

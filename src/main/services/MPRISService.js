@@ -26,7 +26,7 @@ class MPRISService extends EventEmitter {
         'org.mpris.MediaPlayer2': {
           Raise: () => {
             const win = global.mainWindow;
-            if (win) {
+            if (win && !win.isDestroyed()) {
               win.show();
               win.focus();
             }
@@ -51,11 +51,15 @@ class MPRISService extends EventEmitter {
           Seek: (offset) => {
             const newPos = Math.max(0, Math.min(this.duration, this.currentPosition + offset / 1000000));
             const win = global.mainWindow;
-            win?.webContents.send('seek-to', newPos);
+            if (win && !win.isDestroyed()) {
+                win.webContents.send('seek-to', newPos);
+            }
           },
           SetPosition: (id, pos) => {
             const win = global.mainWindow;
-            win?.webContents.send('seek-to', pos / 1000000);
+            if (win && !win.isDestroyed()) {
+                win.webContents.send('seek-to', pos / 1000000);
+            }
           },
           OpenUri: (uri) => {}
         }

@@ -89,6 +89,11 @@ function createAudioWindow() {
       </body>
     </html>
   `);
+
+  audioWindow.on("closed", () => {
+    audioWindow = null;
+    if (audioService) audioService.setWindow(null);
+  });
 }
 
 let audioService = null;
@@ -152,82 +157,63 @@ if (!gotTheLock) {
       "32x32.png",
     );
 
-    console.log("Intentando crear icono de bandeja en:", iconPath);
-
-    if (!fs.existsSync(iconPath)) {
-      console.error("❌ No se encontró el icono del tray en:", iconPath);
-      return;
-    }
+    if (!fs.existsSync(iconPath)) return;
 
     try {
       const trayIcon = nativeImage.createFromPath(iconPath);
-      const finalIcon =
-        process.platform === "linux"
-          ? trayIcon.resize({ width: 22, height: 22 })
-          : trayIcon;
+      // En Linux, redimensionar a un tamaño estándar (22px) mejora la compatibilidad en GNOME/KDE
+      const finalIcon = process.platform === "linux" 
+        ? trayIcon.resize({ width: 22, height: 22 }) 
+        : trayIcon;
 
       tray = new Tray(finalIcon);
 
+      // Menú simplificado y estándar para máxima compatibilidad
       const contextMenu = Menu.buildFromTemplate([
-        {
-          label: "Mostrar JearCast",
-          click: () => {
-            const win = global.mainWindow;
-            win?.show();
-            win?.focus();
-          },
+        { 
+          label: "JearCast Music", 
+          enabled: false 
         },
         { type: "separator" },
-        {
-          label: "Reproducir / Pausa",
-          click: () => {
-            console.log("Tray: Play/Pause clicked");
-            global.mainWindow?.webContents.send(
-              "media-key-pressed",
-              "playpause",
-            );
-          },
-        },
-        {
-          label: "Siguiente",
-          click: () => {
-            console.log("Tray: Next clicked");
-            global.mainWindow?.webContents.send("media-key-pressed", "next");
-          },
-        },
-        {
-          label: "Anterior",
-          click: () => {
-            console.log("Tray: Prev clicked");
-            global.mainWindow?.webContents.send("media-key-pressed", "prev");
-          },
+        { 
+          label: "Mostrar Ventana", 
+          click: () => { 
+            mainWindow?.show(); 
+            mainWindow?.focus(); 
+          } 
         },
         { type: "separator" },
-        {
-          label: "Salir",
+        { 
+          label: "Reproducir / Pausa", 
+          click: () => mainWindow?.webContents.send("media-key-pressed", "playpause") 
+        },
+        { 
+          label: "Siguiente", 
+          click: () => mainWindow?.webContents.send("media-key-pressed", "next") 
+        },
+        { 
+          label: "Anterior", 
+          click: () => mainWindow?.webContents.send("media-key-pressed", "prev") 
+        },
+        { type: "separator" },
+        { 
+          label: "Salir", 
           click: () => {
             app.isQuiting = true;
             app.quit();
-          },
-        },
+          }
+        }
       ]);
 
-      tray.setToolTip("JearCast Player");
+      tray.setToolTip("JearCast Music");
       tray.setContextMenu(contextMenu);
 
+      // En Windows/Mac el click suele mostrar la ventana, en Linux depende del sistema
       tray.on("click", () => {
-        if (mainWindow?.isVisible()) {
-          mainWindow.hide();
-        } else {
-          mainWindow?.show();
-          mainWindow?.focus();
-        }
+        if (mainWindow?.isVisible()) mainWindow.hide();
+        else { mainWindow?.show(); mainWindow?.focus(); }
       });
-
-      console.log("✅ Icono de bandeja creado exitosamente.");
-    } catch (error) {
-      console.error("❌ Error al crear el icono de la bandeja:", error);
-    }
+    } catch (e) { console.error(e); }
   }
 
   function setupMediaKeys() {
@@ -311,6 +297,13 @@ if (!gotTheLock) {
         mainWindow.hide();
       }
       return false;
+    });
+
+    mainWindow.on("maximize", () => mainWindow.webContents.send("window-maximized"));
+    mainWindow.on("unmaximize", () => mainWindow.webContents.send("window-unmaximized"));
+    mainWindow.on("closed", () => {
+      mainWindow = null;
+      global.mainWindow = null;
     });
   }
 

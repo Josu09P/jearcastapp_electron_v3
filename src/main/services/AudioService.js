@@ -15,7 +15,7 @@ class AudioService extends EventEmitter {
     }
 
     stopPlayback() {
-        if (this.audioWindow) {
+        if (this.audioWindow && !this.audioWindow.isDestroyed()) {
             this.audioWindow.webContents.send('audio-control', { action: 'stop' });
         }
         this.isPlaying = false;
@@ -24,8 +24,8 @@ class AudioService extends EventEmitter {
     }
 
     async play(audioPath) {
-        if (!this.audioWindow) {
-            console.error("Motor de audio no inicializado");
+        if (!this.audioWindow || this.audioWindow.isDestroyed()) {
+            console.error("Motor de audio no inicializado o destruido");
             return;
         }
 
@@ -44,7 +44,7 @@ class AudioService extends EventEmitter {
 
     setVolume(vol) {
         this.volume = Math.max(0, Math.min(100, vol));
-        if (this.audioWindow) {
+        if (this.audioWindow && !this.audioWindow.isDestroyed()) {
             this.audioWindow.webContents.send('audio-control', { 
                 action: 'volume', 
                 data: { volume: this.volume } 
